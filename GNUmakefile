@@ -46,11 +46,9 @@ build_deps:
 buildThis:
 	cd $(BUILD) && $(VOC) -s $(mkfile_dir_path)/src/dynamicarray.Mod 
 
-	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/src/test.Mod 
-
 tests:
-	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/src/dynamictest.Mod 
-	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/src/test.Mod 
+	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/test/dynamictest.Mod 
+	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/test/test.Mod 
 
 clean:
 	if [ -d "$(BUILD)" ]; then rm -rf $(BLD); fi
