@@ -93,7 +93,7 @@ REPEAT
 UNTIL i = arr^.capacity;
 *)
 
-dynamicarray.writetofile(arr, "lalal.md");
+dynamicarray.writetofile(arr, "idontknow.md");
 Out.String("written to file seikou"); Out.Ln;
 
 
