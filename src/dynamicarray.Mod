@@ -16,7 +16,7 @@ DynamicarrayDesc* = RECORD(dynarray)
 END;
 
 
-PROCEDURE writetofile*(arr: dynamicarray; name: ARRAY OF CHAR);
+PROCEDURE writetofile*(arr: dynamicarray; name: ARRAY OF CHAR): dynamicarray;
 VAR 
 file: Files.File;
 r: Files.Rider;
@@ -36,10 +36,11 @@ ELSE
 END;
 Files.Register(file);
 Files.Close(file);
+RETURN arr;
 END writetofile;
 
 PROCEDURE copy(VAR src, dst: ARRAY OF CHAR);
-(*if the content is null just overwrite else write after*)
+(*copies according to inky's logic*)
 VAR 
   i: LONGINT;
 BEGIN
@@ -66,9 +67,8 @@ BEGIN
    END;
    
 END copy;
-
+(*reallocates and appends according to inkys logic*)
 PROCEDURE ReallocAndAppendinky(arr: dynamicarray; str: ARRAY OF CHAR);
-(*should i copy the str into tmp or into the array*)
 VAR
   tmp: POINTER TO ARRAY OF CHAR;
 BEGIN
@@ -81,7 +81,7 @@ BEGIN
   (*arr^.size := LEN(tmp^) + LEN(str);*)
   arr^.size := LEN(str);
   arr^.capacity := arr^.capacity + LEN(str) + 1;
-  (* Content and capacity size should be the same?*)
+  (* Content and capacity size should be the same?*) (*no*)
   Out.String("Array size now: "); Out.Int(arr^.size, 0); Out.Ln;
   Out.String("LEN array content size: "); Out.Int(LEN(arr^.content^), 0); Out.Ln;
   Out.String("Array capacitynow: "); Out.Int(arr^.capacity, 0); Out.Ln;
@@ -104,7 +104,7 @@ BEGIN
   UNTIL i = l;
 END dumpArray;
 
-
+(*copies according to my logic*)
 PROCEDURE copylarr0t(VAR src: ARRAY OF CHAR; VAR dst: ARRAY OF CHAR; VAR start: LONGINT);
 VAR 
 i: LONGINT;
@@ -177,27 +177,15 @@ ELSE
 END;
 
 
-(*
-IF s > d THEN
-  REPEAT 
-    dst[i] := src[i];
-    INC(i);
-  UNTIL i = LEN(src) - 1;
-ELSE 
-   REPEAT 
-     dst[i] := src[i];
-     INC(i);
-   UNTIL i = LEN(dst) - 1;
-END;*)
 Out.String("The last index probably is: "); Out.Int(i, 0); Out.Ln;
 
 dst[i] := 0X;
-(*i dont get how to handle the logic of indexing of copying :( *)
 
 END copylarr0t;
 
 
 PROCEDURE ReallocAndAppend(arr: dynamicarray; str: ARRAY OF CHAR);
+(*work on copylarr0t and copy later*)
 VAR 
 tmp: POINTER TO ARRAY OF CHAR;
 i: LONGINT;
@@ -223,7 +211,6 @@ BEGIN
   (*copylarr0t(str, arr^.content^, i);*)
   Strings.Append(str, arr^.content^);
   Out.String("copied the str into the content starting from the tmp last index one less");Out.Ln;
-  (*do I need to handle assigning the last element to be 0X in the copy or here? *)
   
 END ReallocAndAppend;
 
@@ -252,15 +239,6 @@ i: LONGINT;
 BEGIN
 Out.String("capacity during initialization: "); Out.Int(arr.capacity, 0); Out.Ln;
 Out.String("size during initialization: "); Out.Int(arr.size, 0); Out.Ln;
-(*NEW(arr);
-what is dereferencing
-IF arr.capacity = 0 THEN arr.capacity := size; arr.size := size; END;
-IF size <= arr.capacity THEN
-  arr.size := size;
-  arr.capacity := size;
-ELSE 
-  Out.String("you cannot have more elements than you have the capacity for"); Out.Ln; HALT(0);
-END;*)
 NEW(arr.content, size);
 arr.size := size; 
 arr.capacity := size;
@@ -314,6 +292,8 @@ BEGIN
   newarr.capacity := 2 * arr.capacity;
   RETURN newarr;
 END Resize;
+
+
 
 
 
