@@ -8,7 +8,7 @@ answer: strTypes.pstring;
 a: dynamicarray.dynamicarray;
 
 BEGIN
-Out.String("running spartan test");Out.Ln;
+Out.String("running nex test");Out.Ln;
 s := NEX.Create("mozz.us", "1900", "/nex-protocol-notes.txt");
 Out.String("created connection");Out.Ln;
 answer := s.Get(s);
