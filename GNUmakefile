@@ -47,8 +47,7 @@ buildThis:
 	cd $(BUILD) && $(VOC) -s $(mkfile_dir_path)/src/dynamicarray.Mod 
 
 tests:
-	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/test/dynamictest.Mod 
-	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/test/test.Mod 
+	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/test/testnex.Mod 
 
 clean:
 	if [ -d "$(BUILD)" ]; then rm -rf $(BLD); fi

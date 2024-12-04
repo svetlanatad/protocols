@@ -22,6 +22,8 @@ TYPE
     connectionFlag*: BOOLEAN;
     trn*: transport;
     rspnBody*: strTypes.pstring;
+    header-: strTypes.pstring;
+    statusCode: INTEGER;
     rspnFirstLine*: strTypes.pstring;
     contentLength*: LONGINT;
     eol*: ARRAY 2 OF CHAR;
@@ -41,6 +43,7 @@ TYPE
 PROCEDURE clearState*(VAR spartan: Client);
 BEGIN
   spartan^.rspnBody := NIL;
+  spartan^.header := NIL;
   spartan^.rspnFirstLine := NIL;
   spartan^.contentLength := 0;
 END clearState;
@@ -88,7 +91,7 @@ BEGIN
   END;
 END writer;
 
-PROCEDURE readbufer(VAR spartan: Client; VAR buf: ARRAY OF CHAR; VAR i: LONGINT): BOOLEAN;
+PROCEDURE readbuffer(VAR spartan: Client; VAR buf: ARRAY OF CHAR; VAR i: LONGINT): BOOLEAN;
 BEGIN
 IF spartan^.trn IS bsdSocket THEN 
    RETURN Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i); 
@@ -96,7 +99,7 @@ ELSE
 Out.String("spartan is not inintialized with bsdSocket");Out.Ln;
 RETURN FALSE;
 END
-END readbufer;
+END readbuffer;
 
 
 PROCEDURE reader(VAR spartan: Client; VAR buffer: ARRAY OF CHAR): BOOLEAN;
@@ -131,7 +134,20 @@ BEGIN
   RETURN req;
 END buildRequest;
 
-
+PROCEDURE parseHeader(VAR spartan: Client; VAR str: ARRAY OF CHAR);
+VAR 
+  i: INTEGER;
+BEGIN 
+    Out.String("header is: '"); Out.String(str); Out.String("'"); Out.Ln;
+  i := 0;
+  REPEAT 
+    IF (str[i] >= '0') & (str[i] <= '9') THEN 
+       spartan^.statusCode := ORD(str[i]) - ORD('0'); 
+           Out.String("set status code:"); Out.Int(spartan^.statusCode, 0); Out.Ln;
+    END;
+    INC(i);
+  UNTIL i = LEN(str);
+END parseHeader;
 
 
 PROCEDURE zeroBuf(VAR str: ARRAY OF CHAR);
@@ -144,16 +160,52 @@ BEGIN
   UNTIL i = LEN(str)
 END zeroBuf;
 
-
+PROCEDURE readTillCRLF(spartan: Client);
+VAR
+  buf: ARRAY 2 OF CHAR;
+  hdr: ARRAY 256 OF CHAR;
+  b: BOOLEAN;
+  i: INTEGER;
+BEGIN
+  COPY("", hdr); i := 0;
+  REPEAT
+    b := Internet.ReadBytes(spartan^.trn(bsdSocket).socket, buf, 1);
+      IF b THEN
+        IF buf[0] # 0DX THEN
+          hdr[i] := buf[0];
+          INC(i);
+        END;
+        Out.String("have read one byte: '"); Out.Char(buf[0]);
+        Out.String("'"); Out.Ln;
+      ELSE
+         Out.String("failed to read"); Out.Ln; HALT(2);
+      END;
+  UNTIL buf[0] = 0DX;
+  hdr[i] := 0X;
+  b := Internet.ReadBytes(spartan^.trn(bsdSocket).socket, buf, 1);
+  IF b THEN
+    IF buf[0] # 0AX THEN
+      Out.String("0AX expected, got: "); Out.Int(ORD(buf[0]), 0);
+      Out.Ln; HALT(1);
+    END;
+  ELSE
+    Out.String("failed to read"); Out.Ln; HALT(3)
+  END;
+  NEW(spartan^.header, Strings.Length(hdr)+1);
+  COPY(hdr, spartan^.header^);
+  parseHeader(spartan, spartan^.header^);
+END readTillCRLF;
 
 PROCEDURE get*(spartan: Client): strTypes.pstring;
 VAR
   req: strTypes.pstring;
-  buf: ARRAY 16 OF CHAR;
+  buf: ARRAY 15 OF CHAR;
   (*ok so apparentl this k logic works iff reading chunk size is 16*)
+  (*so now it works with 15 bytes but doesnt read # in 16 bytes*)
   i, k: LONGINT;
   b: BOOLEAN;
   responseArr: dynamicarray.dynamicarray; 
+  (*header: dynamicarray.dynamicarray;*)
 BEGIN
   spartan^.clearState(spartan);
 
@@ -170,28 +222,42 @@ BEGIN
     spartan^.dyno := dynomaker(spartan);
     responseArr := dynamicarray.Create();
     i := 0; k := 0;
-
+    readTillCRLF(spartan);
     REPEAT
       zeroBuf(buf);
-     (* b := Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i);*)
+      (*b := Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i);*)
          (*ask inky: when i implement it with oop with the line of code next, it incorrectly reads the request*)
-       b := readbufer(spartan, buf, i);
+       b := readbuffer(spartan, buf, i);
                 (* ^ think later this is too weird*)
       
       Out.String("-------------"); Out.Ln;
       Out.String(buf); Out.Ln;
       Out.String("-------------"); Out.Ln;
-      
+     
+      (* 
       IF k = 0 THEN
+         (*idea
+          create a dyn array here 
+          append the buf here 
+          store it to a global field of spartan
+          write toa seperate file to read
+         *)
+         (*spartan^.header := dynomaker(spartan);*)
+	 (*spartan^.header.appender(spartan^.header, buf);*)
+	 header.appender(header, buf);
+         NEW(spartan^.headerbody, LEN(buf));
+	 COPY(header^.content^, spartan^.headerbody^);
+         (*parseHeader(spartan, spartan^.headerbody^);*)
          responseArr.appender(responseArr, "");
          spartan^.dyno.appender(spartan^.dyno, "");
          Out.String("content of the respons arr during first iter"); Out.String(responseArr.content^); Out.Ln;
 
         Out.String("Tried to skip appending"); Out.Ln;
       ELSE
+      *)
         responseArr.appender(responseArr, buf);
         spartan^.dyno.appender(spartan^.dyno, buf);
-      END;
+      (*END;*)
       Out.String("Response array contents so far:"); Out.Ln;
       Out.String("-------------------------------------------------"); Out.Ln;
       Out.String(responseArr^.content^); Out.Ln;
@@ -208,10 +274,15 @@ BEGIN
     Out.String("Failed to send request"); Out.Ln;
     HALT(5);
   END;
-
+  
   spartan.Disconnect(spartan);
+  (*parseHeader(spartan, spartan^.headerbody^);*)
+  (*Out.String("HEADER CONTENT##################################################################"); Out.String(header^.content^); Out.Ln;
+  Out.String("HEADER CONTENT-----------------------------------------------------------------"); Out.String(spartan^.headerbody^); Out.Ln;
+  Out.String("STATUS CODE #######################################################"); Out.Int(spartan^.statusCode, 0); Out.Ln;*)
   (*spartan^.dyno := saver(spartan, "H.txt");*)
   (*dynamicarray.writetofile(responseArr, "HULLO.txt");*)
+  (*spartan^.header := saver(spartan, "header.txt");*) 
   RETURN spartan^.rspnBody;
 END get;
 

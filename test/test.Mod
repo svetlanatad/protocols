@@ -63,7 +63,7 @@ BEGIN
        i := 0;
        k := 0;
        REPEAT
-         zeroBuf(buf);
+         zeroBuf(buf); (*      longint, array, longint*)
          b := Internet.ReadBuf(conn, buf, i); 
          Out.String("-------------"); Out.Ln;
          Out.String(buf); Out.Ln;
@@ -84,7 +84,7 @@ BEGIN
      Out.String("unable to connect"); Out.Ln
    END;
    Out.String("got everything"); Out.Ln;
-   dynamicarray.writetofile(arr, "aaa.txt");
+   arr := dynamicarray.writetofile(arr, "aaa.txt");
 END get;
 
 
