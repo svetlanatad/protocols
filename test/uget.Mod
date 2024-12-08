@@ -1,6 +1,6 @@
 MODULE uget;
 
-IMPORT Args, SPARTAN, NEX, strTypes, Out, dynamicarray, GEMINI, Strings;
+IMPORT Args, SPARTAN, NEX, strTypes, Out, dynamicarray, GEMINI, Strings, http;
 
 
 TYPE
@@ -16,21 +16,50 @@ VAR
   cmd: strTypes.pstring;
   arg: ARG;
 
+PROCEDURE findslash(str: ARRAY OF CHAR): BOOLEAN;
+VAR 
+  i: INTEGER;
+  b: BOOLEAN;
+BEGIN 
+  i := 1;
+  b := FALSE;
+  REPEAT
+    IF (str[i] = '/') THEN 
+      b := TRUE;
+    END;
+    INC(i); 
+  UNTIL i = LEN(str);
+RETURN b
+END findslash;
+
 PROCEDURE getFilename(): strTypes.pstring;
 
 VAR 
   i,j: INTEGER;
   filen: strTypes.pstring;
+  b: BOOLEAN;
+  def: ARRAY 16 OF CHAR;
 BEGIN 
-  i := 0; j := 1;
-  NEW(filen, LEN(arg.path));
-  REPEAT 
-    filen^[i] := arg.path[j];
-    INC(i); INC(j);
-  UNTIL i = LEN(arg.path) - 1; 
+  b := findslash(arg.path);
+  def := "";
+  IF ~b THEN  
+    i := 0; j := 1;
+    NEW(filen, LEN(arg.path));
+    REPEAT 
+      filen^[i] := arg.path[j];
+      INC(i); INC(j);
+    UNTIL i = LEN(arg.path) - 1; 
  
-  filen^[LEN(arg.path)-1] := 0X;
-  RETURN filen
+    filen^[LEN(arg.path)-1] := 0X;
+    RETURN filen;
+  ELSE 
+     NEW(filen, LEN(def)+1);
+     def := SPARTAN.defName;
+     COPY(def, filen^);
+     filen^[LEN(def)] := 0X;
+     Out.String("File name was set as default. URL path contained an illegal character: "); Out.String(filen^); Out.Ln;
+     RETURN filen;
+   END;
 END getFilename;
 
 PROCEDURE ConnectSpartan;
@@ -39,7 +68,7 @@ VAR
   name, answer: strTypes.pstring;
   a: dynamicarray.dynamicarray;
 BEGIN 
-  s := SPARTAN.Create(arg.prothost^, arg.port, arg.path);
+  s := SPARTAN.Create(arg.host, arg.port, arg.path);
   answer := s.Get(s);
   name := getFilename();
   a := s.Save(s, name^);
@@ -64,6 +93,20 @@ BEGIN
   a := s.Save(s, file^); 
 
 END ConnectNex;
+ 
+
+PROCEDURE ConnectHttp;
+VAR 
+  h: http.Client; 
+  answer: strTypes.pstring;
+
+BEGIN 
+  h := http.Create(arg.host, arg.port, arg.path);
+  h.appendAuthHdr(h, "sona", "sona");
+  answer := h.Get(h);
+  h.Save(h);
+
+END ConnectHttp;
 
 PROCEDURE getInputLength(str: ARRAY OF CHAR): INTEGER;
 (*is corrupted, dont use*)
@@ -86,12 +129,13 @@ VAR
   host, protocol: ARRAY 64 OF CHAR;
   path: ARRAY 246 OF CHAR;
   port: ARRAY 5 OF CHAR;
-  gport, sport, nport: ARRAY 5 OF CHAR;
+  gport, sport, nport, hport: ARRAY 5 OF CHAR;
 BEGIN 
   i := 0; j := 0;
   gport := "3000";
   sport := "300";
   nport := "1900";
+  hport := "80";
 
   (* 
   REPEAT 
@@ -111,6 +155,8 @@ BEGIN
     COPY(sport, port);
   ELSIF protocol = "nex" THEN 
     COPY(nport, port);
+  ELSIF protocol = "http" THEN 
+    COPY(hport, port);
   ELSE
     Out.String("Unknown protocol: "); Out.String(protocol); Out.Ln;
     HALT(1);
@@ -189,6 +235,8 @@ RETURN newstr
 
 END find;
 
+
+
 PROCEDURE ConnectGemini;
 BEGIN
 
@@ -221,12 +269,14 @@ BEGIN
     Out.String("path: "); Out.String(arg.path); Out.Ln;
     (*something := getFilename();
     Out.String("filename is"); Out.String(something^); Out.Ln;*)
-    IF arg.prothost^ = "spartan.mozz.us" THEN 
+    IF arg.protocol = "spartan" THEN 
        ConnectSpartan; 
-    ELSIF arg.prothost^ = "nex.mozz.us" THEN 
+    ELSIF arg.protocol = "nex" THEN 
        ConnectNex; 
-    ELSIF arg.prothost^ = "gemini.mozz.us" THEN 
+    ELSIF arg.protocol = "gemini" THEN
        ConnectGemini; 
+    ELSIF arg.protocol = "http" THEN 
+       ConnectHttp;
     END;
   ELSE 
     Out.String("Usage: protocol://host/path"); Out.Ln;
