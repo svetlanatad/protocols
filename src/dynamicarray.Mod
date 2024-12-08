@@ -219,11 +219,12 @@ PROCEDURE Append*(arr: dynamicarray; str: ARRAY OF CHAR);
 BEGIN
 Out.String("entered append"); Out.Ln;
   IF arr.content = NIL THEN
-    Out.String("arr content is pointer  nil, trying to realloc"); Out.Ln;
-    NEW(arr.content, LEN(str)); (*memory alloc*)
+    Out.String("arr content pointer is  nil, trying to realloc"); Out.Ln;
+    NEW(arr.content, LEN(str) + 1); (*memory alloc*)
     arr.size := LEN(str); 
     arr.capacity := LEN(str);
     COPY(str, arr.content^);
+    arr.content^[LEN(str)] := 0X;
   ELSE
     Out.String("arr content pointer is not nill, trying to enter realloc and append"); Out.Ln;
     ReallocAndAppend(arr, str);
