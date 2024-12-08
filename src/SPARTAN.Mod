@@ -199,9 +199,9 @@ END readTillCRLF;
 PROCEDURE get*(spartan: Client): strTypes.pstring;
 VAR
   req: strTypes.pstring;
-  buf: ARRAY 15 OF CHAR;
+  buf: ARRAY 16 OF CHAR;
   (*ok so apparentl this k logic works iff reading chunk size is 16*)
-  (*so now it works with 15 bytes but doesnt read # in 16 bytes*)
+  (*so now it works with 14 bytes but doesnt read # in 16 bytes*)
   i, k: LONGINT;
   b: BOOLEAN;
   responseArr: dynamicarray.dynamicarray; 
@@ -220,19 +220,19 @@ BEGIN
 
   IF b THEN
     spartan^.dyno := dynomaker(spartan);
-    responseArr := dynamicarray.Create();
+    (*responseArr := dynamicarray.Create();*)
     i := 0; k := 0;
     readTillCRLF(spartan);
     REPEAT
       zeroBuf(buf);
       (*b := Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i);*)
          (*ask inky: when i implement it with oop with the line of code next, it incorrectly reads the request*)
-       b := readbuffer(spartan, buf, i);
+      b := readbuffer(spartan, buf, i);
                 (* ^ think later this is too weird*)
-      
-      Out.String("-------------"); Out.Ln;
-      Out.String(buf); Out.Ln;
-      Out.String("-------------"); Out.Ln;
+      IF b THEN 
+        Out.String("-------------"); Out.Ln;
+        Out.String(buf); Out.Ln;
+        Out.String("-------------"); Out.Ln;
      
       (* 
       IF k = 0 THEN
@@ -255,16 +255,19 @@ BEGIN
         Out.String("Tried to skip appending"); Out.Ln;
       ELSE
       *)
-        responseArr.appender(responseArr, buf);
-        spartan^.dyno.appender(spartan^.dyno, buf);
+
+      (*responseArr.appender(responseArr, buf);*)
+       (* NEW(spartan^.dyno^.content, LEN(buf));*)
+      spartan^.dyno.appender(spartan^.dyno, buf);
       (*END;*)
       Out.String("Response array contents so far:"); Out.Ln;
       Out.String("-------------------------------------------------"); Out.Ln;
-      Out.String(responseArr^.content^); Out.Ln;
+     (* Out.String(responseArr^.content^); Out.Ln;*)
       Out.String(spartan^.dyno^.content^); Out.Ln;
       Out.String("-------------------------------------------------"); Out.Ln;
-
-      INC(k);
+      ELSE 
+        Out.String("couldnt connect"); Out.Ln;
+      END;
     UNTIL ~b OR (i = 0);
     NEW(spartan^.rspnBody, LEN(spartan^.dyno^.content^)); 
     (*NEW(spartan^.rspnBody, LEN(responseArr^.content^));*)
