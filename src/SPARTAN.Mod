@@ -3,7 +3,7 @@ MODULE SPARTAN;
 IMPORT IntStr := oocIntStr, Strings, Files, Out, Internet, strTypes, strUtils, dynamicarray;
 
 CONST
-  defName = "defaultname.gmi";
+  defName* = "defaultname.gmi";
   defEOL = "0DX0AX"; (* CRLF end of line *)
 
 TYPE
