@@ -16,29 +16,57 @@ VAR
   cmd: strTypes.pstring;
   arg: ARG;
 
+PROCEDURE getFilename(): strTypes.pstring;
 
-PROCEDURE ConnectSpartan*;
 VAR 
-  i,k: INTEGER;
+  i,j: INTEGER;
+  filen: strTypes.pstring;
+BEGIN 
+  i := 0; j := 1;
+  NEW(filen, LEN(arg.path));
+  REPEAT 
+    filen^[i] := arg.path[j];
+    INC(i); INC(j);
+  UNTIL i = LEN(arg.path) - 1; 
+ 
+  filen^[LEN(arg.path)-1] := 0X;
+  RETURN filen
+END getFilename;
+
+PROCEDURE ConnectSpartan;
+VAR 
   s: SPARTAN.Client;
-  answer, filename: strTypes.pstring;
+  name, answer: strTypes.pstring;
   a: dynamicarray.dynamicarray;
 BEGIN 
   s := SPARTAN.Create(arg.prothost^, arg.port, arg.path);
   answer := s.Get(s);
-  NEW(filename, LEN(arg.path));
-  i := 0; k := 1; 
-  REPEAT
-      filename^[i] := arg.path[k];
-      INC(i); INC(k);
-  UNTIL i  = LEN(arg.path) - 1;
-      filename^[LEN(arg.path)-1] := 0X;
-  Out.String("filename is: "); Out.String(filename^); Out.Ln;
-  a := s.Save(s, filename^);
+  name := getFilename();
+  a := s.Save(s, name^);
   
 END ConnectSpartan;
 
+
+
+PROCEDURE ConnectNex;
+ 
+VAR 
+  s: NEX.Client;
+  answer: strTypes.pstring;
+  a: dynamicarray.dynamicarray;
+  file: strTypes.pstring;
+
+BEGIN 
+
+  s := NEX.Create(arg.host, arg.port, arg.path);
+  answer := s.Get(s);
+  file := getFilename();
+  a := s.Save(s, file^); 
+
+END ConnectNex;
+
 PROCEDURE getInputLength(str: ARRAY OF CHAR): INTEGER;
+(*is corrupted, dont use*)
 VAR 
   i: INTEGER;
 BEGIN 
@@ -75,8 +103,8 @@ BEGIN
     protocol[i] := cmd[i];
     INC(i);
   END;
+    protocol[i] := 0X;
 
-  (* Validate protocol *)
   IF protocol = "gemini" THEN 
     COPY(gport, port);
   ELSIF protocol = "spartan" THEN 
@@ -84,7 +112,7 @@ BEGIN
   ELSIF protocol = "nex" THEN 
     COPY(nport, port);
   ELSE
-    Out.String("Unknown protocol: "); Out.String(host); Out.Ln;
+    Out.String("Unknown protocol: "); Out.String(protocol); Out.Ln;
     HALT(1);
   END;
 
@@ -161,11 +189,18 @@ RETURN newstr
 
 END find;
 
+PROCEDURE ConnectGemini;
+BEGIN
+
+Out.String("hello gemini"); Out.Ln;
+
+END ConnectGemini;
 
 PROCEDURE Main;
 VAR 
   argLen: INTEGER;
   tmp: ARRAY 246 OF CHAR;
+  (*something: strTypes.pstring;*)
 BEGIN 
   IF Args.argc > 1 THEN 
     tmp := "";
@@ -184,7 +219,15 @@ BEGIN
     Out.String("prothost: "); Out.String(arg.prothost^); Out.Ln;
     Out.String("port: "); Out.String(arg.port); Out.Ln;
     Out.String("path: "); Out.String(arg.path); Out.Ln;
-    IF arg.prothost^ = "spartan.mozz.us" THEN ConnectSpartan; END;
+    (*something := getFilename();
+    Out.String("filename is"); Out.String(something^); Out.Ln;*)
+    IF arg.prothost^ = "spartan.mozz.us" THEN 
+       ConnectSpartan; 
+    ELSIF arg.prothost^ = "nex.mozz.us" THEN 
+       ConnectNex; 
+    ELSIF arg.prothost^ = "gemini.mozz.us" THEN 
+       ConnectGemini; 
+    END;
   ELSE 
     Out.String("Usage: protocol://host/path"); Out.Ln;
   END;
