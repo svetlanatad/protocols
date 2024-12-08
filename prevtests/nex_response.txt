@@ -1,0 +1,152 @@
+
+--__    _____-------______---------________--------_____-------_____--___   __--
+   (_)_)_)                                                            (_(_(_)
+  {_{_){_)                 T               L             T            (_}(_}_}
+  {_)_)_)      P       O       O       O      -      O       E         (_(_(_}
+   {_(_)           R               C             N              S       (_}_}
+    {_)                                                                  (_}
+
+
+     """
+                                THE NEX PROTOCOL
+
+     Nex is a simple internet protocol designed for distributed document
+     retrieval. It's inspired by gopher and gemini.
+
+     Servers should listen on port 1900. Afterall, night falls at 7pm!
+     Users connect and send the server a path which may be empty. The
+     server responds with text or binary data and close the connection. No
+     state is retained.
+
+     Document content is returned as-is. Directory content use plain text
+     with a special syntax where each line begining by "=> " followed by a
+     URL is considred a link. The URL can be absolute or relative. Here are
+     examples:
+
+     => nex://my-site.net
+     => about.txt
+     => ../nexlog/
+
+     Clients can assume that an empty path or a path finishing with / is a
+     directory. A document should be displayed based on the path's file
+     extension. When there is no extension, plain text is assumed.
+
+     Here is an example telnet session:
+     telnet nex.nightfall.city 1900
+     hello-world.txt
+
+     Hello world!                                               O
+     """                                                      o
+                                                        ____   .
+                                                   |\.-'  < '(
+                                                   |/`------`
+
+
+
+     2024-12-12
+
+     The nightfall city aesthetic is great!
+
+                                     ---
+
+     It seems implied that the client must terminate the request with a
+     newline ("\r\n"). Otherwise there's no way for the server to know
+     that the client has finished transmitting the path. Might be worth
+     making this explicit.
+
+                                     ---
+
+     I'm assuming paths should be unescaped and encoded as utf-8, and
+     transmitted over the wire as binary (ala gopher).
+
+         E.g. If I see a selector "=> nex://mozz.us/%09",
+              I should send the server...
+
+                          0x2f 0x09 0x0d 0x0a
+                            /   \t   \r   \n
+
+
+     I'm also assuming that the nex directory responses are utf-8 encoded.
+
+                                     ---
+
+     Opting to rely on file extensions instead of mimetypes is very
+     interesting and comes with some nice properties.
+
+       * Filename -> mimetype databases are practically ubiquitous these
+         days. So save the complexity (and the bandwidth), and let the
+         client do the mimetype lookup instead of the server.
+
+       * Even better, it means that the mimetype is actually dependably
+         part of the URL as metadata. This achieves what gopher attempted
+         and failed at so miserably with item types. With nex, I can
+         opportunistically show an audio player next to that nex link
+         for "/born_in_the_usa.mp3", and rest easy knowing that the
+         server can't throw me a curveball and return a totally different
+         mimetype.
+
+                                     ---
+
+     I really like the removal of alt-text after links.
+
+     Forcing filepaths to be visible in the directory is a cool constraint,
+     because it enforces good conventions for organizing files on your server.
+     You NEED to be clean, because there's no hiding your ugly URLs behind
+     alt text.
+
+     Paths and filenames should be descriptive and use human-readable slugs,
+     with URL-safe characters. Directories should be organized as a hierarchy.
+     Relative paths should be preferred over absolute paths.
+
+     It also makes it immediately apparent to the end-user where a link will
+     take them. Is it internal or external, what type of file will it open,
+     etc. It's very brutalist.
+
+                                     ---
+
+     No response headers is a fun challenge.
+
+     Errors still need to be accounted for. This is a MUST!
+
+     I do NOT want to download /born_in_the_usa.mp3 and end up with a corrupted
+     audio file containing the bytes "Error: File not found". Gopher tortures me
+     with this (gopher+ fixes it, at the expense of my remaining sanity).
+
+     Here's what I came up with for error handing in nex:
+
+         * 0 byte responses should be treated as errors
+         * all other responses should be treated as successful
+
+     Written in more detail...
+
+     ```
+     If the client is requesting a file (text or binary), and the server
+     encounters an error (file not found, internal server error, etc.),
+     the server MUST return 0 bytes and close the connection. The server
+     MUST NOT try to return an error message as a plain text response.
+
+     If the client is requesting a directory, the server MAY automatically
+     generate a directory response that includes an error message and/or
+     helpful links. Alternatively, the server MAY choose to return 0 bytes
+     and close the connection.
+
+     If a client receives a 0-byte response, it MUST treat it as an error.
+     For example, a 0-byte file should not be saved to the filesystem or
+     handled as a valid response.
+     ```
+
+                                     ---
+
+     Lastly, writing in plaintext is a lot of fun (duh).
+
+     🎉
+
+     .
+
+
+
+
+
+
+                             N E X   P R O T O C O L
+                            |   |  | | ||| | |  |   |

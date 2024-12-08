@@ -1,0 +1,20 @@
+#         __
+#        / /
+#       / /
+#  _   / /
+# (_) /_/
+#
+# ~hedy's tw.txt
+# this is where I post super duper short stuff hopefully.
+# I primarily post on my tinylog and sometimes in fediverse, both of which are
+listed on my site and gemini capsule:
+# => hedy.tilde.cafe
+#
+# this file is accessible via HTTPS, gemini, and spartan.
+#
+# nick = hedy
+
+2021-09-27T13:12:21+08:00	Finally started using twtxt. Planning to use this for short entries on my journal/tinylog
+2021-09-27T13:13:38+08:00	I should probably make use of a script which automatically tweets here if a tinylog entry length is smaller than a number
+2022-02-15T10:35:11+08:00	twtxt is has some dependency issues in python3.9 support so I attempted pipx, realized I needed 3.8 or below -> pyenv, fake requirement for aiohttp -> still having errors for url-related operations :/
+2022-02-15T10:35:37+08:00	well I guess tweet works, which is all I need for now.
