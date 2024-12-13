@@ -15,36 +15,35 @@ DynamicarrayDesc* = RECORD(dynarray)
         appender-: PROCEDURE (a: dynamicarray; str: ARRAY OF CHAR);
 END;
 
-
 PROCEDURE writetofile*(arr: dynamicarray; name: ARRAY OF CHAR): dynamicarray;
 VAR 
-file: Files.File;
-r: Files.Rider;
-i, l: LONGINT;
+  file: Files.File;
+  r: Files.Rider;
+  i, l: LONGINT;
 BEGIN
-l := Strings.Length(arr^.content^);
-file := Files.New(name);
-IF file  # NIL THEN 
-   Files.Set(r, file, 0);
-   i := 0;
-   REPEAT
-     Files.Write(r, arr^.content^[i]);
-     INC(i);
-   UNTIL i = l;
-ELSE 
-   Out.String("file was nil"); Out.Ln;
-END;
-Files.Register(file);
-Files.Close(file);
-RETURN arr;
+  l := Strings.Length(arr^.content^);
+  file := Files.New(name);
+  IF file  # NIL THEN 
+     Files.Set(r, file, 0);
+     i := 0;
+     REPEAT
+       Files.Write(r, arr^.content^[i]);
+       INC(i);
+     UNTIL i = l;
+  ELSE 
+     Out.String("file was nil"); Out.Ln;
+  END;
+  Files.Register(file);
+  Files.Close(file);
+  RETURN arr;
 END writetofile;
 
 PROCEDURE copy(VAR src, dst: ARRAY OF CHAR);
-(*copies according to inky's logic*)
+(*copies according to inky's logic, though, with a lot of dumb larr0t stuffs added*)
 VAR 
   i: LONGINT;
 BEGIN
-   IF LEN(src) <= LEN(dst) THEN
+  IF LEN(src) <= LEN(dst) THEN
      i := 0;
        Out.String("good. source length is smaller than or equal to the destination length"); Out.Ln;
     
@@ -65,9 +64,9 @@ BEGIN
    ELSE
       Out.String("copy source, destination: error: destination length needs to be >= src length"); Out.Ln; HALT(0);
    END;
-   
 END copy;
-(*reallocates and appends according to inkys logic*)
+
+(*reallocates and appends according to inkys logic, but actually, not really, i added a lot of larr0t dumb stuffs*)
 PROCEDURE ReallocAndAppendinky(arr: dynamicarray; str: ARRAY OF CHAR);
 VAR
   tmp: POINTER TO ARRAY OF CHAR;
@@ -78,10 +77,8 @@ BEGIN
   copy(arr^.content^, tmp^);
   Out.String("copied the arr content into the tmp content"); Out.Ln;
   NEW(arr^.content, LEN(tmp^) + LEN(str) + 1); 
-  (*arr^.size := LEN(tmp^) + LEN(str);*)
   arr^.size := LEN(str);
   arr^.capacity := arr^.capacity + LEN(str) + 1;
-  (* Content and capacity size should be the same?*) (*no*)
   Out.String("Array size now: "); Out.Int(arr^.size, 0); Out.Ln;
   Out.String("LEN array content size: "); Out.Int(LEN(arr^.content^), 0); Out.Ln;
   Out.String("Array capacitynow: "); Out.Int(arr^.capacity, 0); Out.Ln;
@@ -106,95 +103,86 @@ END dumpArray;
 
 (*copies according to my logic*)
 PROCEDURE copylarr0t(VAR src: ARRAY OF CHAR; VAR dst: ARRAY OF CHAR; VAR start: LONGINT);
+(*its corrupted. it works if you have c optimization enabled, but its not good. dont use. i may think of this later*)
 VAR 
 i: LONGINT;
 j: LONGINT;
 s: LONGINT;
 d: LONGINT;
 BEGIN
-i := start;
-j := 0;
-s := LEN(src);
-d := LEN(dst);
-
-Out.String("len of src is: "); Out.Int(s, 0); Out.Ln;
-Out.String("len of dst is: "); Out.Int(d, 0); Out.Ln;
-
-
-IF dst[i] = 0X THEN
-   Out.String("dst[i] is 0X")
-ELSIF dst[i] = 0AX THEN
-   Out.String("dst[i] is 0A")
-ELSIF dst[i] = 0DX THEN
-   Out.String("dst[i] is 0D")
-ELSE
-   Out.String("before assignment dst["); Out.Int(i, 0); Out.String("]='"); Out.Char(dst[i]); Out.String("'"); Out.Ln;
-END;
- Out.Ln;
-IF i = 0 THEN 
-   REPEAT 
-     dst[i] := src[i];
-     IF src[i] = 0X THEN
-       Out.String("src["); Out.Int(i, 0); Out.String("]='0X'");
-     ELSIF src[i] = 0AX THEN
-       Out.String("src["); Out.Int(i, 0); Out.String("]='0AX'");
-     ELSIF src[i] = 0DX THEN
-       Out.String("src["); Out.Int(i, 0); Out.String("]='0DX'");
-     ELSE
-       Out.String("src["); Out.Int(i, 0); Out.String("]='"); Out.Char(src[i]); Out.String("'"); Out.Ln;
-     END;
-     Out.String("dst["); Out.Int(i, 0); Out.String("]='"); Out.Char(dst[i]); Out.String("'"); Out.Ln;
+  i := start;
+  j := 0;
+  s := LEN(src);
+  d := LEN(dst);
+  Out.String("len of src is: "); Out.Int(s, 0); Out.Ln;
+  Out.String("len of dst is: "); Out.Int(d, 0); Out.Ln;
+  IF dst[i] = 0X THEN
+     Out.String("dst[i] is 0X")
+  ELSIF dst[i] = 0AX THEN
+     Out.String("dst[i] is 0A")
+  ELSIF dst[i] = 0DX THEN
+     Out.String("dst[i] is 0D")
+  ELSE
+     Out.String("before assignment dst["); Out.Int(i, 0); Out.String("]='"); Out.Char(dst[i]); Out.String("'"); Out.Ln;
+  END;
+  Out.Ln;
+  IF i = 0 THEN 
+     REPEAT 
+       dst[i] := src[i];
+       IF src[i] = 0X THEN
+         Out.String("src["); Out.Int(i, 0); Out.String("]='0X'");
+       ELSIF src[i] = 0AX THEN
+         Out.String("src["); Out.Int(i, 0); Out.String("]='0AX'");
+       ELSIF src[i] = 0DX THEN
+         Out.String("src["); Out.Int(i, 0); Out.String("]='0DX'");
+       ELSE
+         Out.String("src["); Out.Int(i, 0); Out.String("]='"); Out.Char(src[i]); Out.String("'"); Out.Ln;
+       END;
+       Out.String("dst["); Out.Int(i, 0); Out.String("]='"); Out.Char(dst[i]); Out.String("'"); Out.Ln;
+       INC(i);
+     UNTIL i = LEN(src) - 1;
+  ELSE 
+       Out.String("current index i am trying to assign is: "); Out.Int(i, 0); Out.Ln;
+     REPEAT
+       IF src[j] = 0X THEN
+         Out.String("src["); Out.Int(j, 0); Out.String("]='0X'");
+       ELSIF src[j] = 0AX THEN
+         Out.String("src["); Out.Int(j, 0); Out.String("]='0AX'");
+       ELSIF src[j] = 0DX THEN
+         Out.String("src["); Out.Int(j, 0); Out.String("]='0DX'");
+       ELSE
+         Out.String("hmmm"); Out.Ln;
+         Out.String("src["); Out.Int(j, 0); Out.String("]='"); Out.Char(src[j]); Out.String("'"); Out.Ln;
+       END;
+      Out.String("assigning"); Out.Ln;
+      dst[i] := src[j];
+      Out.String("assigned"); Out.Ln;
+      Out.String("src["); Out.Int(j, 0); Out.String("]='"); Out.Char(src[j]); Out.String("'"); Out.Ln;
+      Out.String("dst["); Out.Int(i, 0); Out.String("]='"); Out.Char(dst[i]); Out.String("'"); Out.Ln;
       INC(i);
-   UNTIL i = LEN(src) - 1;
-ELSE 
-   Out.String("current index i am trying to assign is: "); Out.Int(i, 0); Out.Ln;
-   REPEAT
-     IF src[j] = 0X THEN
-       Out.String("src["); Out.Int(j, 0); Out.String("]='0X'");
-     ELSIF src[j] = 0AX THEN
-       Out.String("src["); Out.Int(j, 0); Out.String("]='0AX'");
-     ELSIF src[j] = 0DX THEN
-       Out.String("src["); Out.Int(j, 0); Out.String("]='0DX'");
-     ELSE
-       Out.String("hmmm"); Out.Ln;
-       Out.String("src["); Out.Int(j, 0); Out.String("]='"); Out.Char(src[j]); Out.String("'"); Out.Ln;
-     END;
-        Out.String("assigning"); Out.Ln;
-     dst[i] := src[j];
-        Out.String("assigned"); Out.Ln;
-     Out.String("src["); Out.Int(j, 0); Out.String("]='"); Out.Char(src[j]); Out.String("'"); Out.Ln;
-     Out.String("dst["); Out.Int(i, 0); Out.String("]='"); Out.Char(dst[i]); Out.String("'"); Out.Ln;
-     INC(i);
-     INC(j);
-     Out.String("i="); Out.Int(i, 0); Out.Ln;
-     Out.String("j="); Out.Int(j, 0); Out.Ln;
-     Out.String("LEN(dst)="); Out.Int(LEN(dst), 0); Out.Ln;
-     Out.String("src='"); Out.String(src); Out.String("'"); Out.Ln; Out.Ln; Out.Ln;
-     dumpArray(dst);
-     Out.String("dst='"); Out.String(dst); Out.String("'"); Out.Ln; Out.Ln;
-   UNTIL i = LEN(dst) - 2;
-     Out.String("exited the loop"); Out.Ln;
-END;
-
-
-Out.String("The last index probably is: "); Out.Int(i, 0); Out.Ln;
-
-dst[i] := 0X;
-
+      INC(j);
+      Out.String("i="); Out.Int(i, 0); Out.Ln;
+      Out.String("j="); Out.Int(j, 0); Out.Ln;
+      Out.String("LEN(dst)="); Out.Int(LEN(dst), 0); Out.Ln;
+      Out.String("src='"); Out.String(src); Out.String("'"); Out.Ln; Out.Ln; Out.Ln;
+      dumpArray(dst);
+      Out.String("dst='"); Out.String(dst); Out.String("'"); Out.Ln; Out.Ln;
+     UNTIL i = LEN(dst) - 2;
+       Out.String("exited the loop"); Out.Ln;
+  END;
+  Out.String("The last index probably is: "); Out.Int(i, 0); Out.Ln;
+  dst[i] := 0X;
 END copylarr0t;
 
 
 PROCEDURE ReallocAndAppend(arr: dynamicarray; str: ARRAY OF CHAR);
-(*work on copylarr0t and copy later*)
 VAR 
 tmp: POINTER TO ARRAY OF CHAR;
 i: LONGINT;
-
 BEGIN
   i := 0;
   NEW(tmp, LEN(arr^.content^));
   Out.String("allocated array content length memory space to tmp array"); Out.Ln;
-  (*copylarr0t(arr^.content^, tmp^, i);*)
   Strings.Append(arr^.content^, tmp^);
   Out.String("copied the content into the tmp array"); Out.Ln;
   NEW(arr^.content, LEN(tmp^) + LEN(str) + 1);
@@ -203,15 +191,12 @@ BEGIN
   Out.String("The size of the arr: "); Out.Int(arr^.size, 0); Out.Ln;
   Out.String("The capacity of the arr: "); Out.Int(arr^.capacity, 0); Out.Ln;
   Out.String("allocated new memory for array content which is len of tmp + len of str + 1");Out.Ln;
-  (*copylarr0t(tmp^, arr^.content^, i);*)
   Strings.Append(tmp^, arr^.content^);
   Out.String("copied the tmp content back into the array from the first index"); Out.Ln;
   i := (LEN(tmp^) - 2);
   Out.Int(i, 0); Out.String(" is the current iterator"); Out.Ln;
-  (*copylarr0t(str, arr^.content^, i);*)
   Strings.Append(str, arr^.content^);
   Out.String("copied the str into the content starting from the tmp last index one less");Out.Ln;
-  
 END ReallocAndAppend;
 
 
@@ -229,62 +214,50 @@ Out.String("entered append"); Out.Ln;
     Out.String("arr content pointer is not nill, trying to enter realloc and append"); Out.Ln;
     ReallocAndAppend(arr, str);
   END;
-  
 END Append;
 
 
 PROCEDURE Init*(arr: dynamicarray; size: LONGINT);
 (*initializes with nulls*)
 VAR 
-i: LONGINT;
+  i: LONGINT;
 BEGIN
-Out.String("capacity during initialization: "); Out.Int(arr.capacity, 0); Out.Ln;
-Out.String("size during initialization: "); Out.Int(arr.size, 0); Out.Ln;
-NEW(arr.content, size);
-arr.size := size; 
-arr.capacity := size;
-	
-i := 0;
-REPEAT
-arr.content^[i] := 0X;
-INC(i);
-UNTIL i = size;
-Out.String("capacity after initialization: "); Out.Int(arr.capacity, 0); Out.Ln;
-Out.String("size after initialization: "); Out.Int(arr.size, 0); Out.Ln;
-
+  Out.String("capacity during initialization: "); Out.Int(arr.capacity, 0); Out.Ln;
+  Out.String("size during initialization: "); Out.Int(arr.size, 0); Out.Ln;
+  NEW(arr.content, size);
+  arr.size := size; 
+  arr.capacity := size;	
+  i := 0;
+  REPEAT
+    arr.content^[i] := 0X;
+    INC(i);
+  UNTIL i = size;
+  Out.String("capacity after initialization: "); Out.Int(arr.capacity, 0); Out.Ln;
+  Out.String("size after initialization: "); Out.Int(arr.size, 0); Out.Ln;
 END Init;
 
 (*first we gotta create then initialize*)
 PROCEDURE Create*(): dynamicarray;
-
 VAR 
-arr: dynamicarray;
-
+  arr: dynamicarray;
 BEGIN
-NEW(arr);
-arr.content := NIL;
-(*
-NEW(arr.content, capacity);
-arr.capacity := capacity;
-*)
-
-
-arr.size := 0;
-arr.capacity := 0;
-arr.appender := Append;
-RETURN arr;
+  NEW(arr);
+  arr.content := NIL;
+  arr.size := 0;
+  arr.capacity := 0;
+  arr.appender := Append;
+  RETURN arr;
 END Create;
 
 
-
-
 PROCEDURE Resize*(arr: dynamicarray): dynamicarray;
+(*havent tried it yet, append is better*)
 VAR 
   i: LONGINT;
   newarr: dynamicarray;
 BEGIN
-  NEW(newarr); (*memory allocation*)
-  NEW(newarr.content, 2 * arr.capacity); (*data allocation*)
+  NEW(newarr);
+  NEW(newarr.content, 2 * arr.capacity);
   i := 0; 
   REPEAT 
     newarr.content^[i] := arr.content^[i]; 
@@ -293,10 +266,6 @@ BEGIN
   newarr.capacity := 2 * arr.capacity;
   RETURN newarr;
 END Resize;
-
-
-
-
 
 
 END dynamicarray.

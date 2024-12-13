@@ -1,4 +1,4 @@
-DEPEND = github.com/norayr/strutils github.com/norayr/Internet
+DEPEND = github.com/norayr/strutils github.com/norayr/Internet github.com/norayr/Base64 github.com/norayr/http github.com/norayr/mbedtls
 
 VOC = /opt/voc/bin/voc
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -45,9 +45,12 @@ build_deps:
 
 buildThis:
 	cd $(BUILD) && $(VOC) -s $(mkfile_dir_path)/src/dynamicarray.Mod 
-
+	cd $(BUILD) && $(VOC) -s $(mkfile_dir_path)/src/SPARTAN.Mod 
+	cd $(BUILD) && $(VOC) -s $(mkfile_dir_path)/src/NEX.Mod 
+	cd $(BUILD) && $(VOC) -s $(mkfile_dir_path)/src/GEMINI.Mod 
+	
 tests:
-	cd $(BUILD) && $(VOC) -m $(mkfile_dir_path)/test/testnex.Mod 
-
+	cd $(BUILD) && $(VOC) -cm $(mkfile_dir_path)/test/uget.Mod 
+	cd $(BUILD) && gcc -o uget *.o -static -L/opt/voc/lib -lvoc-O2 /opt/voc/lib/libvoc-O2.a -L. -lmbedtls -lmbedcrypto -lmbedx509 libmbedcrypto.a libmbedtls.a libmbedx509.a
 clean:
 	if [ -d "$(BUILD)" ]; then rm -rf $(BLD); fi

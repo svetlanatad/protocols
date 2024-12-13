@@ -1,6 +1,6 @@
 MODULE uget;
 
-IMPORT Args, SPARTAN, NEX, strTypes, Out, dynamicarray, GEMINI, Strings, http;
+IMPORT Args, SPARTAN, NEX, strTypes, Out, dynamicarray, GEMINI, Strings, http, https;
 
 
 TYPE
@@ -14,7 +14,7 @@ END;
 
 VAR 
   cmd: strTypes.pstring;
-  arg: ARG;
+  arg: ARG; (* TODO get rid of global, move to Main *)
 
 PROCEDURE findslash(str: ARRAY OF CHAR): BOOLEAN;
 VAR 
@@ -102,11 +102,30 @@ VAR
 
 BEGIN 
   h := http.Create(arg.host, arg.port, arg.path);
-  h.appendAuthHdr(h, "sona", "sona");
+  (*h.appendAuthHdr(h, "sona", "sona");*)
   answer := h.Get(h);
   h.Save(h);
 
 END ConnectHttp;
+
+PROCEDURE ConnectHttps;
+VAR 
+  h: https.TLSClient; 
+  answer: strTypes.pstring;
+
+BEGIN 
+  h := https.Create(arg.host, arg.port, arg.path);
+  Out.String("________________________________________"); Out.Ln;
+  Out.String("host="); Out.String(arg.host); Out.Ln;
+  Out.String("port="); Out.String(arg.port); Out.Ln;
+  Out.String("path="); Out.String(arg.path); Out.Ln;
+  Out.String("________________________________________"); Out.Ln;
+  (*h.appendAuthHdr(h, "sona", "sona");*)
+  answer := h.Get(h);
+  h.Save(h);
+
+END ConnectHttps;
+
 
 PROCEDURE getInputLength(str: ARRAY OF CHAR): INTEGER;
 (*is corrupted, dont use*)
@@ -129,13 +148,14 @@ VAR
   host, protocol: ARRAY 64 OF CHAR;
   path: ARRAY 246 OF CHAR;
   port: ARRAY 5 OF CHAR;
-  gport, sport, nport, hport: ARRAY 5 OF CHAR;
+  gport, sport, nport, hport, hsport: ARRAY 5 OF CHAR;
 BEGIN 
   i := 0; j := 0;
   gport := "3000";
   sport := "300";
   nport := "1900";
   hport := "80";
+  hsport := "443";
 
   (* 
   REPEAT 
@@ -157,6 +177,8 @@ BEGIN
     COPY(nport, port);
   ELSIF protocol = "http" THEN 
     COPY(hport, port);
+  ELSIF protocol = "https" THEN 
+    COPY(hsport, port);
   ELSE
     Out.String("Unknown protocol: "); Out.String(protocol); Out.Ln;
     HALT(1);
@@ -277,6 +299,10 @@ BEGIN
        ConnectGemini; 
     ELSIF arg.protocol = "http" THEN 
        ConnectHttp;
+    ELSIF arg.protocol = "https" THEN
+       ConnectHttps;
+    ELSE
+       Out.String("unknown protocol: "); Out.String(arg.protocol); Out.Ln;
     END;
   ELSE 
     Out.String("Usage: protocol://host/path"); Out.Ln;
@@ -287,151 +313,3 @@ BEGIN
   Main;
 END uget.
 
-(*MODULE uget;
-
-IMPORT Args, SPARTAN, NEX, strTypes, Out, dynamicarray, GEMINI;
-
-VAR 
-cmd: strTypes.pstring;
-
-PROCEDURE ConnectSpartan*;
-VAR 
-  s: SPARTAN.Client;
-  answer: strTypes.pstring;
-  a: dynamicarray.dynamicarray;
-BEGIN 
-  (*s := SPARTAN.Create(cmd);*)
-
-END ConnectSpartan;
-
-PROCEDURE parseCmd(cmd: ARRAY OF CHAR);
-VAR 
-  i,j: INTEGER;
-  host: ARRAY 64 OF CHAR;
-  path: ARRAY 264 OF CHAR;
-  port: ARRAY 5 OF CHAR;
-  geminiport, spartanport, nexport: ARRAY 5 OF CHAR;
-BEGIN
-  i := 0; j := 0; 
-  geminiport := "3000";
-  spartanport := "300";
-  nexport := "1900";
-  REPEAT 
-   (*IF cmd[i] # NIL THEN *)
-    host[i] := cmd[i];
-    IF cmd[i] = "/" THEN 
-       IF cmd[i+1] = "/" THEN 
-          host[i] := cmd[i];
-          host[i+1] := cmd[i+1];
-          host[i + 2] := 0X;
-          Out.String("appended host"); Out.String(host); Out.Ln;
-        END;
-    ELSE 
-       Out.String("Host should be in the format: protocol ,':', '/', '/', you are missing the second slash"); Out.Ln;
-       Out.String("current parsed host: "); Out.String(host); Out.Ln;
-
-    END;
-        IF host = "gemini://" THEN 
-        COPY(geminiport, port);
-        Out.String("byouhaakimaero...shinumonoga"); Out.Ln;  
-    ELSIF host = "spartan://" THEN 
-        COPY(spartanport, port);
-    ELSIF host = "nex://" THEN 
-        COPY(nexport, port);
-    ELSE
-       Out.String("unknown host, aborting"); HALT(1);
-    END; 
-    INC(i);
-     
-    IF cmd[i] = "/" THEN 
-         Out.String("found a slash"); Out.Ln;
-         path[j] := cmd[i];
-    ELSE 
-         Out.String("there is no slash after host, aborting"); HALT(2); 
-    END;
-    INC(j);     
-    path[j] := cmd[i];
-     (*ELSE
-       Out.String("Null cmd");
-    END;*)
-  INC(i);
-  UNTIL i = LEN(cmd);
-  Out.String("Parsed path: "); Out.String(path); Out.Ln;   
-
-END parseCmd;
-
-PROCEDURE parseCommand(cmd: ARRAY OF CHAR);
-VAR
-i,j: INTEGER;
-host: ARRAY 64 OF CHAR;
-path: ARRAY 246 OF CHAR;
-port: ARRAY 5 OF CHAR;
-gport, sport, nport: ARRAY 5 OF CHAR;
-
-BEGIN 
-i := 0; j := 0;
-gport := "3000";
-sport := "300";
-nport := "1900";
-
-REPEAT 
-IF cmd[i] # 0X THEN 
-   Out.String("Current character: '"); Out.Char(cmd[i]); Out.String("'"); Out.Ln;
-ELSE 
-  Out.String("Dont try looking at nil content"); Out.Ln;
-END;
-INC(i);
-
-UNTIL i = LEN(cmd);
-
-END parseCommand;
-
-
-PROCEDURE getInputLength(cmd: ARRAY OF CHAR): INTEGER;
-(* corrupted, dont use *)
-VAR 
-i: INTEGER;
-
-BEGIN 
-Out.String("ENTERED getinputlength"); Out.Ln;
-i := 0;
-REPEAT 
-IF cmd[i] # 0X THEN INC(i); 
-ELSE 
-Out.String("null command");
-
-END;
-UNTIL i = LEN(cmd);
-RETURN i;
-Out.String("LEFT getinputlength"); Out.Ln;
-END getInputLength;
-
-PROCEDURE Main;
-VAR 
-argLen: INTEGER;
-tmp: ARRAY 246 OF CHAR;
-BEGIN 
-Out.String("ENTERED Main"); Out.Ln;
-  IF Args.argc > 1 THEN 
-Out.String("there is an argument"); Out.Ln;
-(*Out.String("assigned inputlength of cmd to arglen"); Out.Ln;*)
-    Args.Get(1, tmp);
-    argLen := getInputLength(tmp);
-    NEW(cmd, argLen + 1);
-    COPY(tmp, cmd^);
-    cmd^[argLen] := 0X;
-    parseCommand(cmd^);
-  ELSE 
-    Out.String("Usage: protocol://host/path"); Out.Ln;
-  END;
-
-END Main; 
-
-
-BEGIN 
-
-Main;
-
-
-
-END uget.*)

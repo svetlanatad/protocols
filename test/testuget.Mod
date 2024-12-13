@@ -101,6 +101,7 @@ VAR
   tmp: ARRAY 246 OF CHAR;
 BEGIN 
   IF Args.argc > 1 THEN 
+    tmp := "";
     Args.Get(1, tmp);
     Out.String(tmp); Out.Ln;
     argLen := getInputLength(tmp);
