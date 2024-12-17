@@ -1,6 +1,6 @@
 MODULE GEMINI;
 
-IMPORT IntStr := oocIntStr, Strings, Files, Out, Internet, strTypes, strUtils, dynamicarray;
+IMPORT IntStr := oocIntStr, Strings, Files, Out, Internet, strTypes, strUtils, dynamicarray, http, mbedtls;
 
 CONST
   defName = "defaultname.gmi";
@@ -15,9 +15,29 @@ TYPE
     socket : Internet.Socket
   END;
 
+   TLSSocket = POINTER TO TLSSocketDesc;
+   TLSSocketDesc = RECORD(transportDesc)
+     netContext* : ARRAY 512 OF CHAR;    (* 4 bytes are enough *)
+     sslContext* : ARRAY 512 OF CHAR;   (* 472 bytes *)
+     sslConf*    : ARRAY 512 OF CHAR;   (* 400 bytes *)
+   END;
+    
+  
+
   Client* = POINTER TO ClientDesc;
 
   ClientDesc* = RECORD
+    entropy*  : ARRAY 40000 OF CHAR; (* 1080 on x86_64, 37000 on armhl *)
+    ctrDrbg*  : ARRAY 512 OF CHAR;   (* 392 bytes *)
+    cacert*   : ARRAY 1024 OF CHAR;  (* 616 bytes *)
+    crtpath*   : ARRAY 256 OF CHAR; 
+    pers*     : ARRAY 128 OF CHAR;
+
+  setCertPath*  : PROCEDURE (VAR h: Client; path: ARRAY OF CHAR);
+   setPers*      : PROCEDURE (VAR h: Client; pers: ARRAY OF CHAR);
+      Init*      : PROCEDURE (VAR h: Client);
+
+
     host*, port*, path*: strTypes.pstring;
     connectionFlag*: BOOLEAN;
     trn*: transport;
@@ -37,10 +57,118 @@ TYPE
     Connect*: PROCEDURE(VAR gemini: Client): BOOLEAN;
     Disconnect*: PROCEDURE(VAR gemini: Client);
     Write*: PROCEDURE(VAR gemini: Client; request: ARRAY OF CHAR): BOOLEAN;
-    Read*: PROCEDURE(VAR gemini: Client; VAR buffer: ARRAY OF CHAR): BOOLEAN;
+    Read*: PROCEDURE(VAR gemini: Client; VAR buf: ARRAY OF CHAR; VAR toRead: LONGINT): BOOLEAN;
     Dynomaker: PROCEDURE(VAR gemini: Client): dynamicarray.dynamicarray;
     Save*: PROCEDURE(VAR gemini: Client; name: ARRAY OF CHAR): dynamicarray.dynamicarray;
+(*use reader*) 
+
+END;
+
+
+PROCEDURE init(VAR gemini: Client);
+BEGIN
+  IF gemini^.trn IS TLSSocket THEN
+    mbedtls.init(gemini^.trn(TLSSocket).netContext, gemini^.trn(TLSSocket).sslContext, gemini^.trn(TLSSocket).sslConf, gemini^.entropy, gemini^.ctrDrbg, gemini^.cacert, gemini^.pers, gemini^.crtpath)
   END;
+END init;
+
+PROCEDURE setcertpath(VAR gemini: Client; path: ARRAY OF CHAR);
+BEGIN
+  COPY(path, gemini^.crtpath);
+END setcertpath;
+
+(* change TLSCLient to Client *)
+(* Personalization data (Device specific identifiers) *)
+PROCEDURE setpers(VAR gemini: Client; str: ARRAY OF CHAR);
+BEGIN
+  COPY(str, gemini^.pers)
+END setpers;
+
+
+PROCEDURE connector(VAR gemini: Client):BOOLEAN;
+VAR i: LONGINT;
+BEGIN
+  gemini.connectionFlag := FALSE;
+  IF gemini^.trn IS TLSSocket THEN
+    i := mbedtls.connect(gemini^.trn(TLSSocket).netContext, gemini^.trn(TLSSocket).sslContext, gemini^.trn(TLSSocket).sslConf, gemini(Client)^.entropy, gemini(Client)^.ctrDrbg, gemini(Client)^.cacert, gemini^.host^, gemini^.port^);
+    IF i = 0 THEN gemini^.connectionFlag := TRUE ELSE gemini^.connectionFlag := FALSE END;
+  ELSE
+    Out.String("gemini client is not initialized with tls socket"); Out.Ln;
+    HALT(5);
+  END;
+  RETURN gemini^.connectionFlag
+END connector;
+
+PROCEDURE disconnector(VAR gemini: Client);
+VAR
+  i: LONGINT;
+BEGIN
+  IF gemini IS Client THEN
+    i := mbedtls.disconnect(gemini^.trn(TLSSocket).netContext, gemini^.trn(TLSSocket).sslContext, gemini^.trn(TLSSocket).sslConf, gemini(Client)^.entropy, gemini(Client)^.ctrDrbg);
+  ELSE
+    Out.String("gemini client is not initialized with tls socket"); Out.Ln;
+    HALT(5);
+  END;
+END disconnector;
+
+
+
+PROCEDURE reader*(VAR gemini: Client; VAR buf: ARRAY OF CHAR; toRead: LONGINT): BOOLEAN;
+VAR
+  len: LONGINT;
+  r: LONGINT;
+BEGIN
+    r := -1;
+  IF gemini^.trn IS TLSSocket THEN
+    IF toRead = -1 THEN len := LEN(buf)-1 ELSE len := toRead END;
+    r := mbedtls.read(gemini^.trn(TLSSocket).sslContext, buf, len);
+  ELSE
+    Out.String("gemini client is not initialized with tls socket"); Out.Ln;
+    HALT(5);
+  END;
+  RETURN (r > 0)
+END reader;
+
+PROCEDURE writer(VAR gemini: Client; buf: ARRAY OF CHAR):BOOLEAN;
+VAR
+  len: LONGINT; r: LONGINT;
+BEGIN
+  r := -1;
+  IF gemini^.trn IS TLSSocket THEN
+    len := Strings.Length(buf);
+    r := mbedtls.write(gemini^.trn(TLSSocket).sslContext, buf, len);
+  ELSE
+    Out.String("gemini client is not initialized with tls socket"); Out.Ln;
+    HALT(5);
+  END;
+  RETURN r = 0;
+END writer;
+
+
+PROCEDURE readBuf(VAR gemini: Client; VAR buf: ARRAY OF CHAR; VAR haveRead: LONGINT): BOOLEAN;
+VAR
+  r: LONGINT;
+BEGIN
+  gemini^.connectionFlag := FALSE;
+  IF gemini^.trn IS TLSSocket THEN
+    r := mbedtls.readBuf(gemini^.trn(TLSSocket).netContext, gemini^.trn(TLSSocket).sslContext, buf, haveRead);
+    IF r <= 0 THEN
+      gemini^.connectionFlag := FALSE;
+      haveRead := 0;
+    ELSE
+      gemini^.connectionFlag := TRUE
+    END;
+   ELSE
+    Out.String("gemini client is not initialized with tls socket"); Out.Ln;
+    HALT(5);
+  END;
+  RETURN gemini^.connectionFlag
+END readBuf;
+
+(* we have init, setcertpath, setpers, connector, disconnector, writer, reader, readBuf *) 
+
+
+
 
 PROCEDURE clearState*(VAR gemini: Client);
 BEGIN
@@ -60,7 +188,7 @@ PROCEDURE saver(VAR gemini: Client; name: ARRAY OF CHAR): dynamicarray.dynamicar
 BEGIN
 RETURN dynamicarray.writetofile(gemini^.dyno, name);
 END saver;
-
+(*
 PROCEDURE connector(VAR gemini: Client): BOOLEAN;
 BEGIN
   gemini^.connectionFlag := FALSE;
@@ -72,7 +200,8 @@ BEGIN
   END;
   RETURN gemini^.connectionFlag;
 END connector;
-
+*)
+(*
 PROCEDURE disconnector(VAR gemini: Client);
 BEGIN
   IF gemini^.trn IS bsdSocket THEN
@@ -82,7 +211,9 @@ BEGIN
     HALT(5);
   END;
 END disconnector;
+*)
 
+(*
 PROCEDURE writer(VAR gemini: Client; request: ARRAY OF CHAR): BOOLEAN;
 BEGIN
   IF gemini^.trn IS bsdSocket THEN
@@ -93,7 +224,9 @@ BEGIN
     RETURN FALSE;
   END;
 END writer;
+*)
 
+(*
 PROCEDURE readbuffer(VAR gemini: Client; VAR buf: ARRAY OF CHAR; VAR i: LONGINT): BOOLEAN;
 BEGIN
 IF gemini^.trn IS bsdSocket THEN 
@@ -103,8 +236,9 @@ Out.String("gemini is not inintialized with bsdSocket");Out.Ln;
 RETURN FALSE;
 END
 END readbuffer;
+*)
 
-
+(*
 PROCEDURE reader(VAR gemini: Client; VAR buffer: ARRAY OF CHAR): BOOLEAN;
 BEGIN
   IF gemini^.trn IS bsdSocket THEN
@@ -114,6 +248,8 @@ BEGIN
     RETURN FALSE;
   END;
 END reader;
+*)
+
 
 PROCEDURE buildRequest*(gemini: Client): strTypes.pstring;
 VAR
@@ -323,7 +459,7 @@ BEGIN
       zeroBuf(buf);
       (*b := Internet.ReadBuf(gemini^.trn(bsdSocket).socket, buf, i);*)
          (*ask inky: when i implement it with oop with the line of code next, it incorrectly reads the request*)
-       b := readbuffer(gemini, buf, i);
+       b := readBuf(gemini, buf, i);
                 (* ^ think later this is too weird*)
       
       Out.String("-------------"); Out.Ln;
@@ -388,7 +524,7 @@ END get;
 PROCEDURE Create*(host, port, path: ARRAY OF CHAR): Client;
 VAR
   gemini: Client;
-  socket: bsdSocket;
+  socket: TLSSocket;
 BEGIN
   NEW(gemini);
   gemini^.eol[0] := 0DX; gemini^.eol[1] := 0AX; gemini^.null[0] := 0X;
@@ -402,18 +538,30 @@ BEGIN
   gemini^.contentLength := 0;
 
   (* Assign methods *)
-  gemini^.Create := Create;
   gemini^.Get := get;
+  gemini^.Create := Create;
   gemini^.clearState := clearState;
 
   NEW(socket);
   gemini^.trn := socket;
-  gemini^.Connect := connector;
-  gemini^.Disconnect := disconnector;
-  gemini^.Write := writer;
-  gemini^.Read := reader;
+  gemini.Connect := connector;
+  gemini.Disconnect := disconnector;
+  (*gemini.Read := reader;*)
+  gemini.Write := writer;
   gemini^.Dynomaker := dynomaker;
   gemini^.Save := saver;
+
+  gemini.setCertPath := setcertpath; (* change to gemini *)
+  gemini.setPers     := setpers;
+
+  gemini.setCertPath(gemini, "/etc/ssl/certs/ca-certificates.crt");
+  (*hs.setCertPath(hs, "./isrgrootx1.pem");*)
+  (*hs.setCertPath(hs, "./ca-certificates.crt");*)
+
+  gemini.setPers(gemini, "oberon_mbedtls_client");
+  gemini.Init := init;
+
+
   RETURN gemini;
 END Create;
 
