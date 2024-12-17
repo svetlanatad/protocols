@@ -75,6 +75,20 @@ BEGIN
   
 END ConnectSpartan;
 
+PROCEDURE ConnectGemini;
+VAR 
+  g: GEMINI.Client;
+  name, answer: strTypes.pstring;
+  a: dynamicarray.dynamicarray;
+BEGIN
+ g := GEMINI.Create(arg.host, arg.port, arg.path);
+ Out.String("trying to initialize socket"); Out.Ln;
+ g.Init(g);
+ answer := g.Get(g);
+ name := getFilename();
+ a := g.Save(g, name^); 
+
+END ConnectGemini;
 
 
 PROCEDURE ConnectNex;
@@ -108,6 +122,8 @@ BEGIN
 
 END ConnectHttp;
 
+
+
 PROCEDURE ConnectHttps;
 VAR 
   h: https.TLSClient; 
@@ -115,12 +131,12 @@ VAR
 
 BEGIN 
   h := https.Create(arg.host, arg.port, arg.path);
+  h.Init(h);
   Out.String("________________________________________"); Out.Ln;
   Out.String("host="); Out.String(arg.host); Out.Ln;
   Out.String("port="); Out.String(arg.port); Out.Ln;
   Out.String("path="); Out.String(arg.path); Out.Ln;
   Out.String("________________________________________"); Out.Ln;
-  (*h.appendAuthHdr(h, "sona", "sona");*)
   answer := h.Get(h);
   h.Save(h);
 
@@ -258,13 +274,6 @@ RETURN newstr
 END find;
 
 
-
-PROCEDURE ConnectGemini;
-BEGIN
-
-Out.String("hello gemini"); Out.Ln;
-
-END ConnectGemini;
 
 PROCEDURE Main;
 VAR 
