@@ -1,6 +1,6 @@
 MODULE GEMINI;
 
-IMPORT IntStr := oocIntStr, Strings, Files, Out, Internet, strTypes, strUtils, dynamicarray, http, mbedtls;
+IMPORT IntStr := oocIntStr, Strings, Files, Out, Internet, strTypes, strUtils, dynamicarray, http, mbedtls, SYSTEM;
 
 CONST
   defName = "defaultname.gmi";
@@ -67,9 +67,11 @@ END;
 
 PROCEDURE init(VAR gemini: Client);
 BEGIN
+  Out.String("entered init"); Out.Ln;
   IF gemini^.trn IS TLSSocket THEN
     mbedtls.init(gemini^.trn(TLSSocket).netContext, gemini^.trn(TLSSocket).sslContext, gemini^.trn(TLSSocket).sslConf, gemini^.entropy, gemini^.ctrDrbg, gemini^.cacert, gemini^.pers, gemini^.crtpath)
   END;
+Out.String("left init"); Out.Ln;
 END init;
 
 PROCEDURE setcertpath(VAR gemini: Client; path: ARRAY OF CHAR);
@@ -81,6 +83,7 @@ END setcertpath;
 (* Personalization data (Device specific identifiers) *)
 PROCEDURE setpers(VAR gemini: Client; str: ARRAY OF CHAR);
 BEGIN
+    Out.String("test"); Out.Ln;
   COPY(str, gemini^.pers)
 END setpers;
 
@@ -88,10 +91,23 @@ END setpers;
 PROCEDURE connector(VAR gemini: Client):BOOLEAN;
 VAR i: LONGINT;
 BEGIN
+  Out.String("entered connector"); Out.Ln;
   gemini.connectionFlag := FALSE;
   IF gemini^.trn IS TLSSocket THEN
+    Out.String("trying to initialize tls socket attrs to the client"); Out.Ln;
     i := mbedtls.connect(gemini^.trn(TLSSocket).netContext, gemini^.trn(TLSSocket).sslContext, gemini^.trn(TLSSocket).sslConf, gemini(Client)^.entropy, gemini(Client)^.ctrDrbg, gemini(Client)^.cacert, gemini^.host^, gemini^.port^);
-    IF i = 0 THEN gemini^.connectionFlag := TRUE ELSE gemini^.connectionFlag := FALSE END;
+
+Out.String("Debugging TLS socket initialization:");
+Out.String("NetContext: "); Out.Int(SYSTEM.ADR(gemini^.trn(TLSSocket).netContext), 0); Out.Ln;
+Out.String("SslContext: "); Out.Int(SYSTEM.ADR(gemini^.trn(TLSSocket).sslContext), 0); Out.Ln;
+Out.String("SslConf: "); Out.Int(SYSTEM.ADR(gemini^.trn(TLSSocket).sslConf), 0); Out.Ln;
+Out.String("Entropy: "); Out.Int(SYSTEM.ADR(gemini(Client)^.entropy), 0); Out.Ln;
+Out.String("CtrDrbg: "); Out.Int(SYSTEM.ADR(gemini(Client)^.ctrDrbg), 0); Out.Ln;
+Out.String("CACert: "); Out.Int(SYSTEM.ADR(gemini(Client)^.cacert), 0); Out.Ln;
+Out.String("Host: "); Out.String(gemini^.host^); Out.Ln;
+Out.String("Port: "); Out.String(gemini^.port^); Out.Ln;
+
+    IF i = 0 THEN gemini^.connectionFlag := TRUE; Out.String("the connection is set to true"); Out.Ln; ELSE gemini^.connectionFlag := FALSE; Out.String("the connection is set to false"); Out.Ln; Out.Int(i,0); Out.Ln; END;
   ELSE
     Out.String("gemini client is not initialized with tls socket"); Out.Ln;
     HALT(5);
@@ -135,8 +151,10 @@ VAR
 BEGIN
   r := -1;
   IF gemini^.trn IS TLSSocket THEN
+    Out.String("gemini client is initialized with tls socket"); Out.Ln; 
     len := Strings.Length(buf);
     r := mbedtls.write(gemini^.trn(TLSSocket).sslContext, buf, len);
+    Out.String("the value of mbedtls write: "); Out.Int(r, 0); Out.Ln; 
   ELSE
     Out.String("gemini client is not initialized with tls socket"); Out.Ln;
     HALT(5);
@@ -256,7 +274,8 @@ VAR
   req: strTypes.pstring;
   len: INTEGER;
 BEGIN
-  len := Strings.Length(gemini^.host^) + Strings.Length(gemini^.path^) + 10; (* SP and EOL *)
+  len := Strings.Length(gemini^.host^) + Strings.Length(gemini^.path^) + 9; (* SP and EOL *)
+(*...^ changed this to 9, because, gemini + crlf is nine*)
   NEW(req, len);
   (* CHECK *) 
   (* Build the request line *)
@@ -266,7 +285,9 @@ BEGIN
   Strings.Append(gemini^.path^, req^);
   (*Strings.Append(" ", req^);*)
   (*                ^ ask inky: I keep changing this and the next line to Append " 0", req^ and it gives either the gemini protocol or # the gemini protocol*)
+  (*COPY("0DX0AX", gemini^.eol);*)
   Strings.Append(gemini^.eol, req^);
+  Out.String("built request: "); Out.String(req^); Out.Ln;
 
   RETURN req;
 END buildRequest;
@@ -432,24 +453,24 @@ PROCEDURE get*(gemini: Client): strTypes.pstring;
 VAR
   req: strTypes.pstring;
   buf: ARRAY 15 OF CHAR;
-  (*ok so apparentl this k logic works iff reading chunk size is 16*)
-  (*so now it works with 15 bytes but doesnt read # in 16 bytes*)
   i, k: LONGINT;
   b: BOOLEAN;
   responseArr: dynamicarray.dynamicarray; 
   (*header: dynamicarray.dynamicarray;*)
 BEGIN
   gemini^.clearState(gemini);
-
+  Out.String("entered get and cleared state"); Out.Ln;
   gemini^.connectionFlag := gemini.Connect(gemini);
   IF ~gemini^.connectionFlag THEN
     Out.String("Connection failed"); Out.Ln;
     HALT(5);
   END;
 
+  Out.String("trying to build request"); Out.Ln;
   req := buildRequest(gemini);
+  Out.String("trying to write the request to the client"); Out.Ln;
   b := writer(gemini, req^);
-
+  
   IF b THEN
     gemini^.dyno := dynomaker(gemini);
     responseArr := dynamicarray.Create();
