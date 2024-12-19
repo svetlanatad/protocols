@@ -84,6 +84,7 @@ BEGIN
  g := GEMINI.Create(arg.host, arg.port, arg.path);
  Out.String("trying to initialize socket"); Out.Ln;
  g.Init(g);
+ Out.String("left init in connect gemini"); Out.Ln;
  answer := g.Get(g);
  name := getFilename();
  a := g.Save(g, name^); 
@@ -167,7 +168,7 @@ VAR
   gport, sport, nport, hport, hsport: ARRAY 5 OF CHAR;
 BEGIN 
   i := 0; j := 0;
-  gport := "3000";
+  gport := "1965";
   sport := "300";
   nport := "1900";
   hport := "80";
