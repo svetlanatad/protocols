@@ -143,6 +143,21 @@ BEGIN
 
 END ConnectHttps;
 
+PROCEDURE ConnectHttpsAuth(usr: ARRAY OF CHAR; pwd: ARRAY OF CHAR);
+
+VAR 
+  h: https.TLSClient;
+  answer: strTypes.pstring;
+BEGIN
+  Out.String("Entered ConnectHttpsAuth"); Out.Ln; 
+  h := https.Create(arg.host, arg.port, arg.path);
+  h.appendAuthHdr(h, usr, pwd);
+  h.Init(h);
+  answer := h.Get(h); 
+  h.Save(h);
+
+END ConnectHttpsAuth;
+
 
 PROCEDURE getInputLength(str: ARRAY OF CHAR): INTEGER;
 (*is corrupted, dont use*)
@@ -303,7 +318,7 @@ VAR
   pwd: strTypes.pstring;
   (*something: strTypes.pstring;*)
 BEGIN 
-  IF Args.argc = 1 THEN
+  IF Args.argc = 2 THEN
       cmd := getCommand(1); 
       (*tmp := "";
       Args.Get(1, tmp);
@@ -376,6 +391,14 @@ BEGIN
                    Out.Int(LEN(usr^), 0); Out.Ln;*)
                    pwd := getCommand(5);
                    IF pwd^ = "" THEN Out.String("Warning: Your password is blank"); Out.Ln; END;
+                   cmd := getCommand(1); 
+                   Out.String("parsing the following command: "); Out.String(cmd^); Out.Ln;
+                   parseCommand(cmd^); 
+                   IF arg.protocol = "https" THEN ConnectHttpsAuth(usr^, pwd^); 
+                   ELSE 
+                      Out.String("Authentication not yet implemented for the following protocol: "); Out.String(arg.protocol); Out.Ln; HALT(6);
+                   END;
+               
                    (*tmp := "";
                    Args.Get(5, tmp);
                    Out.String(tmp); Out.Ln;
