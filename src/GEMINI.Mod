@@ -4,7 +4,7 @@ IMPORT IntStr := oocIntStr, Strings, Files, Out, Internet, strTypes, strUtils, d
 
 CONST
   defName = "defaultname.gmi";
-  defEOL = "0DX0AX"; (* CRLF end of line *)
+  defEOL = "0DX0AX";
 
 TYPE
   transport* = POINTER TO transportDesc;
@@ -60,7 +60,7 @@ TYPE
     Read*: PROCEDURE(VAR gemini: Client; VAR buf: ARRAY OF CHAR; VAR toRead: LONGINT): BOOLEAN;
     Dynomaker: PROCEDURE(VAR gemini: Client): dynamicarray.dynamicarray;
     Save*: PROCEDURE(VAR gemini: Client; name: ARRAY OF CHAR): dynamicarray.dynamicarray;
-(*use reader*) 
+(*TODO use reader in create*) 
 
 END;
 
@@ -79,7 +79,6 @@ BEGIN
   COPY(path, gemini^.crtpath);
 END setcertpath;
 
-(* change TLSCLient to Client *)
 (* Personalization data (Device specific identifiers) *)
 PROCEDURE setpers(VAR gemini: Client; str: ARRAY OF CHAR);
 BEGIN
@@ -128,7 +127,7 @@ BEGIN
 END disconnector;
 
 
-
+(*TODO*)
 PROCEDURE reader*(VAR gemini: Client; VAR buf: ARRAY OF CHAR; toRead: LONGINT): BOOLEAN;
 VAR
   len: LONGINT;
@@ -183,10 +182,6 @@ BEGIN
   RETURN gemini^.connectionFlag
 END readBuf;
 
-(* we have init, setcertpath, setpers, connector, disconnector, writer, reader, readBuf *) 
-
-
-
 
 PROCEDURE clearState*(VAR gemini: Client);
 BEGIN
@@ -206,67 +201,6 @@ PROCEDURE saver(VAR gemini: Client; name: ARRAY OF CHAR): dynamicarray.dynamicar
 BEGIN
 RETURN dynamicarray.writetofile(gemini^.dyno, name);
 END saver;
-(*
-PROCEDURE connector(VAR gemini: Client): BOOLEAN;
-BEGIN
-  gemini^.connectionFlag := FALSE;
-  IF gemini^.trn IS bsdSocket THEN
-    gemini^.connectionFlag := Internet.Connect(gemini^.host^, gemini^.port^, gemini^.trn(bsdSocket).socket);
-  ELSE
-    Out.String("Gemini client is not initialized with bsd socket"); Out.Ln;
-    HALT(5);
-  END;
-  RETURN gemini^.connectionFlag;
-END connector;
-*)
-(*
-PROCEDURE disconnector(VAR gemini: Client);
-BEGIN
-  IF gemini^.trn IS bsdSocket THEN
-    Internet.Disconnect(gemini^.trn(bsdSocket).socket);
-  ELSE
-    Out.String("Gemini client is not initialized with bsd socket"); Out.Ln;
-    HALT(5);
-  END;
-END disconnector;
-*)
-
-(*
-PROCEDURE writer(VAR gemini: Client; request: ARRAY OF CHAR): BOOLEAN;
-BEGIN
-  IF gemini^.trn IS bsdSocket THEN
-    RETURN Internet.Write(gemini^.trn(bsdSocket).socket, request);
-  (*b := Internet.Write(gemini^.trn(bsdSocket).socket, req^);*)
-  ELSE
-    Out.String("Gemini client is not initialized with bsd socket"); Out.Ln;
-    RETURN FALSE;
-  END;
-END writer;
-*)
-
-(*
-PROCEDURE readbuffer(VAR gemini: Client; VAR buf: ARRAY OF CHAR; VAR i: LONGINT): BOOLEAN;
-BEGIN
-IF gemini^.trn IS bsdSocket THEN 
-   RETURN Internet.ReadBuf(gemini^.trn(bsdSocket).socket, buf, i); 
-ELSE 
-Out.String("gemini is not inintialized with bsdSocket");Out.Ln;
-RETURN FALSE;
-END
-END readbuffer;
-*)
-
-(*
-PROCEDURE reader(VAR gemini: Client; VAR buffer: ARRAY OF CHAR): BOOLEAN;
-BEGIN
-  IF gemini^.trn IS bsdSocket THEN
-    RETURN Internet.Read(gemini^.trn(bsdSocket).socket, buffer);
-  ELSE
-    Out.String("Gemini client is not initialized with bsd socket"); Out.Ln;
-    RETURN FALSE;
-  END;
-END reader;
-*)
 
 
 PROCEDURE buildRequest*(gemini: Client): strTypes.pstring;
@@ -277,15 +211,9 @@ BEGIN
   len := Strings.Length(gemini^.host^) + Strings.Length(gemini^.path^) + 9; (* SP and EOL *)
 (*...^ changed this to 9, because, gemini + crlf is nine*)
   NEW(req, len);
-  (* CHECK *) 
-  (* Build the request line *)
   COPY("gemini://", req^);
   Strings.Append(gemini^.host^, req^);
-  (*COPY(gemini^.host^, req^);*)
   Strings.Append(gemini^.path^, req^);
-  (*Strings.Append(" ", req^);*)
-  (*                ^ ask inky: I keep changing this and the next line to Append " 0", req^ and it gives either the gemini protocol or # the gemini protocol*)
-  (*COPY("0DX0AX", gemini^.eol);*)
   Strings.Append(gemini^.eol, req^);
   Out.String("built request: "); Out.String(req^); Out.Ln;
 
@@ -351,7 +279,6 @@ BEGIN
     Out.String("header is: '"); Out.String(str); Out.String("'"); Out.Ln;
   i := 0;
   res := 0;
- (* maybe use internet.readbytes? *) (*confusion*)
   statuscode := "";
   REPEAT 
       IF (str[i] >= '0') & (str[i] <= '9') THEN 
@@ -369,13 +296,11 @@ BEGIN
       END;
       INC(i);
   UNTIL i = LEN(str);
-  (*check if single or double digit*)
   IntStr.StrToInt(statuscode, statuscodeint, res);
   IF (statuscodeint < 10) OR (statuscodeint > 69) THEN 
      Out.String("invalid status code, it should be between ten and sixty nine"); Out.Ln; HALT(6);
   END;
   Out.String("assigning the status code to the client"); Out.Ln;
-  (*gemini^.statusCode := statuscodeint;*)
   Out.String("status code: "); Out.Int(gemini^.statusCode, 0); Out.Ln;
   IF (statuscodeint >= 10) & (statuscodeint <= 19) THEN 
    
@@ -456,7 +381,6 @@ VAR
   i, k: LONGINT;
   b: BOOLEAN;
   responseArr: dynamicarray.dynamicarray; 
-  (*header: dynamicarray.dynamicarray;*)
 BEGIN
   gemini^.clearState(gemini);
   Out.String("entered get and cleared state"); Out.Ln;
@@ -478,39 +402,14 @@ BEGIN
     readTillCRLF(gemini);
     REPEAT
       zeroBuf(buf);
-      (*b := Internet.ReadBuf(gemini^.trn(bsdSocket).socket, buf, i);*)
-         (*ask inky: when i implement it with oop with the line of code next, it incorrectly reads the request*)
-       b := readBuf(gemini, buf, i);
-                (* ^ think later this is too weird*)
-      
+      b := readBuf(gemini, buf, i);
       Out.String("-------------"); Out.Ln;
       Out.String(buf); Out.Ln;
       Out.String("-------------"); Out.Ln;
      
-      (* 
-      IF k = 0 THEN
-         (*idea
-          create a dyn array here 
-          append the buf here 
-          store it to a global field of gemini
-          write toa seperate file to read
-         *)
-         (*gemini^.header := dynomaker(gemini);*)
-	 (*gemini^.header.appender(gemini^.header, buf);*)
-	 header.appender(header, buf);
-         NEW(gemini^.headerbody, LEN(buf));
-	 COPY(header^.content^, gemini^.headerbody^);
-         (*parseHeader(gemini, gemini^.headerbody^);*)
-         responseArr.appender(responseArr, "");
-         gemini^.dyno.appender(gemini^.dyno, "");
-         Out.String("content of the respons arr during first iter"); Out.String(responseArr.content^); Out.Ln;
-
-        Out.String("Tried to skip appending"); Out.Ln;
-      ELSE
-      *)
-        responseArr.appender(responseArr, buf);
-        gemini^.dyno.appender(gemini^.dyno, buf);
-      (*END;*)
+      
+      responseArr.appender(responseArr, buf);
+      gemini^.dyno.appender(gemini^.dyno, buf);
       Out.String("Response array contents so far:"); Out.Ln;
       Out.String("-------------------------------------------------"); Out.Ln;
       Out.String(responseArr^.content^); Out.Ln;
@@ -520,9 +419,7 @@ BEGIN
       INC(k);
     UNTIL ~b OR (i = 0);
     NEW(gemini^.rspnBody, LEN(gemini^.dyno^.content^)); 
-    (*NEW(gemini^.rspnBody, LEN(responseArr^.content^));*)
     COPY(gemini^.dyno^.content^, gemini^.rspnBody^);
-    (*COPY(responseArr^.content^, gemini^.rspnBody^);*)
   ELSE
     Out.String("Failed to send request"); Out.Ln;
     HALT(5);
@@ -533,13 +430,8 @@ BEGIN
   (*Out.String("HEADER CONTENT##################################################################"); Out.String(header^.content^); Out.Ln;
   Out.String("HEADER CONTENT-----------------------------------------------------------------"); Out.String(gemini^.headerbody^); Out.Ln;
   Out.String("STATUS CODE #######################################################"); Out.Int(gemini^.statusCode, 0); Out.Ln;*)
-  (*gemini^.dyno := saver(gemini, "H.txt");*)
-  (*dynamicarray.writetofile(responseArr, "HULLO.txt");*)
-  (*gemini^.header := saver(gemini, "header.txt");*) 
   RETURN gemini^.rspnBody;
 END get;
-
-
 
 
 PROCEDURE Create*(host, port, path: ARRAY OF CHAR): Client;
@@ -550,15 +442,12 @@ BEGIN
   NEW(gemini);
   gemini^.eol[0] := 0DX; gemini^.eol[1] := 0AX; gemini^.null[0] := 0X;
 
-  (* Initialize fields *)
   strUtils.string2pstring(host, gemini^.host);
   strUtils.string2pstring(port, gemini^.port);
   strUtils.string2pstring(path, gemini^.path);
 
-  (* Set default values *)
   gemini^.contentLength := 0;
 
-  (* Assign methods *)
   gemini^.Get := get;
   gemini^.Create := Create;
   gemini^.clearState := clearState;
@@ -567,18 +456,18 @@ BEGIN
   gemini^.trn := socket;
   gemini.Connect := connector;
   gemini.Disconnect := disconnector;
+  (*TODO fix this*)
   (*gemini.Read := reader;*)
   gemini.Write := writer;
   gemini^.Dynomaker := dynomaker;
   gemini^.Save := saver;
 
-  gemini.setCertPath := setcertpath; (* change to gemini *)
+  gemini.setCertPath := setcertpath;
   gemini.setPers     := setpers;
 
   gemini.setCertPath(gemini, "/etc/ssl/certs/ca-certificates.crt");
   (*hs.setCertPath(hs, "./isrgrootx1.pem");*)
   (*hs.setCertPath(hs, "./ca-certificates.crt");*)
-
   gemini.setPers(gemini, "oberon_mbedtls_client");
   gemini.Init := init;
 
