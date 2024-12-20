@@ -274,48 +274,128 @@ RETURN newstr
 
 END find;
 
+PROCEDURE getCommand(i: INTEGER): strTypes.pstring;
+VAR 
+  argLen: INTEGER;
+  tmp: ARRAY 246 OF CHAR;
+  cmd: strTypes.pstring;
+BEGIN 
+  tmp := "";
+  Args.Get(i, tmp);
+  Out.String(tmp); Out.Ln;
+  argLen := Strings.Length(tmp);
+  Out.Int(argLen, 0); Out.Ln;
+  NEW(cmd, argLen + 1); (* Allocate memory dynamically for cmd *)
+  COPY(tmp, cmd^);
+  cmd^[argLen] := 0X; (* Null-terminate the string *)
+  Out.String("pstring to string cmd: "); Out.String(cmd^); Out.Ln;
+ 
+RETURN cmd
 
+END getCommand;
 
 PROCEDURE Main;
 VAR 
   argLen: INTEGER;
   tmp: ARRAY 246 OF CHAR;
+  cmd: strTypes.pstring;
+  usr: strTypes.pstring;
+  pwd: strTypes.pstring;
   (*something: strTypes.pstring;*)
 BEGIN 
-  IF Args.argc > 1 THEN 
-    tmp := "";
-    Args.Get(1, tmp);
-    Out.String(tmp); Out.Ln;
-    argLen := Strings.Length(tmp);
-    Out.Int(argLen, 0); Out.Ln;
-    NEW(cmd, argLen + 1); (* Allocate memory dynamically for cmd *)
-    COPY(tmp, cmd^);
-    cmd^[argLen] := 0X; (* Null-terminate the string *)
-    Out.String("pstring to string cmd: "); Out.String(cmd^); Out.Ln;
-    Out.Int(LEN(cmd^), 0); Out.Ln;
-    parseCommand(cmd^);
-    arg.prothost := find(arg.protocol, arg.host);
-    Out.String("#####################################"); Out.Ln;
-    Out.String("prothost: "); Out.String(arg.prothost^); Out.Ln;
-    Out.String("port: "); Out.String(arg.port); Out.Ln;
-    Out.String("path: "); Out.String(arg.path); Out.Ln;
-    (*something := getFilename();
-    Out.String("filename is"); Out.String(something^); Out.Ln;*)
-    IF arg.protocol = "spartan" THEN 
-       ConnectSpartan; 
-    ELSIF arg.protocol = "nex" THEN 
-       ConnectNex; 
-    ELSIF arg.protocol = "gemini" THEN
-       ConnectGemini; 
-    ELSIF arg.protocol = "http" THEN 
-       ConnectHttp;
-    ELSIF arg.protocol = "https" THEN
-       ConnectHttps;
-    ELSE
-       Out.String("unknown protocol: "); Out.String(arg.protocol); Out.Ln;
-    END;
-  ELSE 
-    Out.String("Usage: protocol://host/path"); Out.Ln;
+  IF Args.argc = 1 THEN
+      cmd := getCommand(1); 
+      (*tmp := "";
+      Args.Get(1, tmp);
+      Out.String(tmp); Out.Ln;
+      argLen := Strings.Length(tmp);
+      Out.Int(argLen, 0); Out.Ln;
+      NEW(cmd, argLen + 1); (* Allocate memory dynamically for cmd *)
+      COPY(tmp, cmd^);
+      cmd^[argLen] := 0X; (* Null-terminate the string *)
+      Out.String("pstring to string cmd: "); Out.String(cmd^); Out.Ln;
+      Out.Int(LEN(cmd^), 0); Out.Ln;*)
+
+      parseCommand(cmd^);
+      arg.prothost := find(arg.protocol, arg.host);
+      Out.String("#####################################"); Out.Ln;
+      Out.String("prothost: "); Out.String(arg.prothost^); Out.Ln;
+      Out.String("port: "); Out.String(arg.port); Out.Ln;
+      Out.String("path: "); Out.String(arg.path); Out.Ln;
+      (*something := getFilename();
+      Out.String("filename is"); Out.String(something^); Out.Ln;*)
+      IF arg.protocol = "spartan" THEN 
+         ConnectSpartan; 
+      ELSIF arg.protocol = "nex" THEN 
+         ConnectNex; 
+      ELSIF arg.protocol = "gemini" THEN
+         ConnectGemini; 
+      ELSIF arg.protocol = "http" THEN 
+         ConnectHttp;
+      ELSIF arg.protocol = "https" THEN
+         ConnectHttps;
+      ELSE
+         Out.String("unknown protocol: "); Out.String(arg.protocol); Out.Ln;
+      END;
+     ELSIF Args.argc > 2 THEN 
+      cmd := getCommand(2);
+      (*tmp := "";
+      Args.Get(2, tmp);
+      Out.String(tmp); Out.Ln;
+      argLen := Strings.Length(tmp);
+      Out.Int(argLen, 0); Out.Ln;
+      NEW(cmd, argLen + 1); (* Allocate memory dynamically for cmd *)
+      COPY(tmp, cmd^);
+      cmd^[argLen] := 0X; (* Null-terminate the string *)
+      Out.String("pstring to string cmd: "); Out.String(cmd^); Out.Ln;
+      Out.Int(LEN(cmd^), 0); Out.Ln;*)
+        IF cmd^ = "-u" THEN 
+             cmd := getCommand(4);
+             (* 
+             tmp := "";
+             Args.Get(4, tmp);
+             Out.String(tmp); Out.Ln;
+             argLen := Strings.Length(tmp);
+             Out.Int(argLen, 0); Out.Ln;
+             NEW(cmd, argLen + 1); (* Allocate memory dynamically for cmd *)
+             COPY(tmp, cmd^);
+             cmd^[argLen] := 0X; (* Null-terminate the string *)
+             Out.String("pstring to string cmd: "); Out.String(cmd^); Out.Ln;
+             Out.Int(LEN(cmd^), 0); Out.Ln;*)
+		IF cmd^ = "-p" THEN 
+                   usr := getCommand(3);
+                   (*tmp := "";
+                   Args.Get(3, tmp);
+                   Out.String(tmp); Out.Ln;
+                   argLen := Strings.Length(tmp);
+                   Out.Int(argLen, 0); Out.Ln;
+                   NEW(usr, argLen + 1); (* Allocate memory dynamically for cmd *)
+                   COPY(tmp, usr^);
+                   usr^[argLen] := 0X; (* Null-terminate the string *)
+                   Out.String("pstring to string usr: "); Out.String(usr^); Out.Ln;
+                   Out.Int(LEN(usr^), 0); Out.Ln;*)
+                   pwd := getCommand(5);
+                   IF pwd^ = "" THEN Out.String("Warning: Your password is blank"); Out.Ln; END;
+                   (*tmp := "";
+                   Args.Get(5, tmp);
+                   Out.String(tmp); Out.Ln;
+                   argLen := Strings.Length(tmp);
+                   Out.Int(argLen, 0); Out.Ln;
+                   NEW(pwd, argLen + 1); (* Allocate memory dynamically for cmd *)
+                   COPY(tmp, pwd^);
+                   pwd^[argLen] := 0X;
+                   Out.String("pstring to string pwd: "); Out.String(pwd^); Out.Ln;
+                   Out.Int(LEN(pwd^), 0); Out.Ln;*)
+                   ELSE 
+                      Out.String("Usage: protocol://path-to-file.extension -u username -p password"); Out.Ln;
+                   END;
+                   ELSE 
+                      Out.String("Usage: protocol://path-to-file.extension -u username -p password"); Out.Ln;
+                   END;
+                  
+                    
+  ELSE
+    Out.String("Usage: protocol://host/path [-u | username -p password]" ); Out.Ln;
   END;
 END Main;
 
