@@ -57,7 +57,7 @@ TYPE
     Connect*: PROCEDURE(VAR gemini: Client): BOOLEAN;
     Disconnect*: PROCEDURE(VAR gemini: Client);
     Write*: PROCEDURE(VAR gemini: Client; request: ARRAY OF CHAR): BOOLEAN;
-    Read*: PROCEDURE(VAR gemini: Client; VAR buf: ARRAY OF CHAR; VAR toRead: LONGINT): BOOLEAN;
+    Read*: PROCEDURE(VAR gemini: Client; VAR buf: ARRAY OF CHAR; toRead: LONGINT): BOOLEAN;
     Dynomaker: PROCEDURE(VAR gemini: Client): dynamicarray.dynamicarray;
     Save*: PROCEDURE(VAR gemini: Client; name: ARRAY OF CHAR): dynamicarray.dynamicarray;
 (*TODO use reader in create*) 
@@ -155,12 +155,11 @@ BEGIN
     Out.String("buf last char is "); Out.Int(ORD(buf[len-1]), 0); Out.Ln;
     r := mbedtls.write(gemini^.trn(TLSSocket).sslContext, buf, len);
     Out.String("the value of mbedtls write: "); Out.Int(r, 0); Out.Ln; 
-    Out.String("status code: "); Out.Int(gemini^.statusCode, 0); Out.Ln;
   ELSE
     Out.String("gemini client is not initialized with tls socket"); Out.Ln;
     HALT(5);
   END;
-  RETURN r = 0;
+  RETURN r > 0;
 END writer;
 
 
@@ -232,60 +231,29 @@ BEGIN
   RETURN req;
 END buildRequest;
 
-PROCEDURE getMimetype(VAR gemini: Client;  VAR str: ARRAY OF CHAR);
+PROCEDURE getMimetype(VAR gemini: Client;  VAR str: ARRAY OF CHAR; startPos: LONGINT);
 VAR 
 i, pos: INTEGER;
 foundspace, b: BOOLEAN;
-mim: strTypes.pstring;
+mim: ARRAY 32 OF CHAR;
 hdr: ARRAY 244 OF CHAR;
 buf: ARRAY 2 OF CHAR;
 BEGIN
   Out.String("entered getMimetype"); Out.Ln;
-  NEW(mim, LEN(str));
-  pos := -1;
-  foundspace := FALSE;
   i := 0;
-  COPY("", hdr);
-  REPEAT 
-    IF (str[i] = " ") THEN 
-       IF ~foundspace THEN 
-	   foundspace := TRUE;
-	   pos := i + 1;
-       ELSE 
-	   IF pos # -1 THEN 
-    
- 
-                b := Internet.ReadBytes(gemini^.trn(bsdSocket).socket, buf, 1);
-                IF b THEN 
-		    IF buf[0] # 0DX THEN 
-		        hdr[pos] := buf[0];
-		    END;
-		Out.String("have read one byte: "); Out.Char(buf[0]);Out.Ln;
-                ELSE 
- 		Out.String("failed to read"); Out.Ln;
-                END;     
-
-	   END;
-       Out.String("did not find space"); Out.Ln;
-       END;
-    END;
-  INC(i);    
-  UNTIL buf[0] = 0DX;
-  COPY(hdr, mim^); 
-  IF mim # NIL THEN 
-    gemini^.mimetype := mim;
-    Out.String("assigned mimetype"); Out.String(mim^); Out.Ln;
-  ELSE 
-    Out.String("could not assign"); Out.Ln;
-  END;
-
+  REPEAT
+    mim[i] := str[startPos];
+    INC(i); INC(startPos);
+  UNTIL str[i] = ";";
+  str[i] := 0X; 
+  NEW(gemini.mimetype, LEN(str));
+  COPY(str, gemini.mimetype^);
 END getMimetype;
-
 
 PROCEDURE parseHeader(VAR gemini: Client; VAR str: ARRAY OF CHAR);
 VAR 
   i, statuscodeint: LONGINT;
-  res: SHORTINT;
+  res: IntStr.ConvResults;
   statuscode: ARRAY 4 OF CHAR;
 BEGIN 
     Out.String("header is: '"); Out.String(str); Out.String("'"); Out.Ln;
@@ -293,35 +261,28 @@ BEGIN
   res := 0;
   statuscode := "";
   REPEAT 
-      IF (str[i] >= '0') & (str[i] <= '9') THEN 
-
-      IF (str[i + 1] >= '0') & (str[i+1] <= '9') THEN 
-         statuscode[i] := str[i]; 
-         statuscode[i+1] := str[i+1]; 
-         statuscode[3] := 0X;
-      ELSE
-         statuscode[i] := str[i]; 
-         statuscode[2] := 0X;
-      END;
-      ELSE
-         Out.String("status code should be a number"); Out.Ln;   
-      END;
-      INC(i);
-  UNTIL i = LEN(str);
+       statuscode[i] := str[i];
+       INC(i);
+  UNTIL str[i] = " ";
+  statuscode[i] := 0X;
   IntStr.StrToInt(statuscode, statuscodeint, res);
+  IF res # IntStr.strAllRight THEN
+    Out.String("status code: "); Out.String(statuscode);
+    Out.String(" is invalid and cannot be converted to integer.");
+    Out.Ln;
+    HALT(1);
+  END;
   IF (statuscodeint < 10) OR (statuscodeint > 69) THEN 
      Out.String("invalid status code, it should be between ten and sixty nine"); Out.Ln; HALT(6);
   END;
   Out.String("assigning the status code to the client"); Out.Ln;
-  Out.String("status code: "); Out.Int(gemini^.statusCode, 0); Out.Ln;
   IF (statuscodeint >= 10) & (statuscodeint <= 19) THEN 
-   
     gemini^.statusCode := 10;
     gemini^.statusRead := "Input expected"; 
   ELSIF (statuscodeint > 19) & (statuscodeint < 30) THEN 
     gemini^.statusRead := "Success";
     gemini^.statusCode := 20;
-    getMimetype(gemini, str);
+    getMimetype(gemini, str, i);
   ELSIF (statuscodeint >= 30) & (statuscodeint < 40) THEN 
     gemini^.statusCode := 30;
     gemini^.statusRead := "Redirection";
@@ -334,6 +295,8 @@ BEGIN
   ELSIF (statuscodeint >= 60) & (statuscodeint <= 69) THEN 
     gemini^.statusCode := 60;
     gemini^.statusRead := "Client certificates";
+  ELSE
+    gemini.statusCode := statuscodeint;
   END;
   Out.String("assigned the status read to the client"); Out.String(gemini^.statusRead); Out.Ln;
  
@@ -359,7 +322,8 @@ VAR
 BEGIN
   COPY("", hdr); i := 0;
   REPEAT
-    b := Internet.ReadBytes(gemini^.trn(bsdSocket).socket, buf, 1);
+    (*b := Internet.ReadBytes(gemini^.trn(bsdSocket).socket, buf, 1);*)
+    b := gemini.Read(gemini, buf, 1);
       IF b THEN
         IF buf[0] # 0DX THEN
           hdr[i] := buf[0];
@@ -372,7 +336,8 @@ BEGIN
       END;
   UNTIL buf[0] = 0DX;
   hdr[i] := 0X;
-  b := Internet.ReadBytes(gemini^.trn(bsdSocket).socket, buf, 1);
+  (*b := Internet.ReadBytes(gemini^.trn(bsdSocket).socket, buf, 1);*)
+  b := gemini.Read(gemini, buf, 1);
   IF b THEN
     IF buf[0] # 0AX THEN
       Out.String("0AX expected, got: "); Out.Int(ORD(buf[0]), 0);
@@ -408,6 +373,7 @@ BEGIN
   b := gemini.Write(gemini, req^);
   
   IF b THEN
+    Out.String("b is TRUEEEEE"); Out.Ln;
     gemini^.dyno := dynomaker(gemini);
     responseArr := dynamicarray.Create();
     i := 0; k := 0;
@@ -469,7 +435,7 @@ BEGIN
   gemini.Connect := connector;
   gemini.Disconnect := disconnector;
   (*TODO fix this*)
-  (*gemini.Read := reader;*)
+  gemini.Read := reader;
   gemini.Write := writer;
   gemini^.Dynomaker := dynomaker;
   gemini^.Save := saver;
