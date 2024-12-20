@@ -3,8 +3,8 @@ MODULE GEMINI;
 IMPORT IntStr := oocIntStr, Strings, Files, Out, Internet, strTypes, strUtils, dynamicarray, http, mbedtls, SYSTEM;
 
 CONST
-  defName = "defaultname.gmi";
-  defEOL = "0DX0AX";
+  defName = "index.gmi";
+  protocol = "gemini://";
 
 TYPE
   transport* = POINTER TO transportDesc;
@@ -151,9 +151,11 @@ BEGIN
   r := -1;
   IF gemini^.trn IS TLSSocket THEN
     Out.String("gemini client is initialized with tls socket"); Out.Ln; 
-    len := Strings.Length(buf);
+    len := LEN(buf);
+    Out.String("buf last char is "); Out.Int(ORD(buf[len-1]), 0); Out.Ln;
     r := mbedtls.write(gemini^.trn(TLSSocket).sslContext, buf, len);
     Out.String("the value of mbedtls write: "); Out.Int(r, 0); Out.Ln; 
+    Out.String("status code: "); Out.Int(gemini^.statusCode, 0); Out.Ln;
   ELSE
     Out.String("gemini client is not initialized with tls socket"); Out.Ln;
     HALT(5);
@@ -207,15 +209,25 @@ PROCEDURE buildRequest*(gemini: Client): strTypes.pstring;
 VAR
   req: strTypes.pstring;
   len: INTEGER;
+  i: INTEGER;
 BEGIN
-  len := Strings.Length(gemini^.host^) + Strings.Length(gemini^.path^) + 9; (* SP and EOL *)
+  len := Strings.Length(protocol) + Strings.Length(gemini^.host^) + Strings.Length(gemini^.path^) + LEN(gemini^.eol) + LEN(gemini^.null) - 1; (* SP and EOL *)
 (*...^ changed this to 9, because, gemini + crlf is nine*)
   NEW(req, len);
-  COPY("gemini://", req^);
+  COPY(protocol, req^);
   Strings.Append(gemini^.host^, req^);
   Strings.Append(gemini^.path^, req^);
-  Strings.Append(gemini^.eol, req^);
+  (*Strings.Append(gemini^.eol, req^);*)
+  req^[len-2] := gemini^.eol[0];
+  req^[len-1] := gemini^.eol[1];
   Out.String("built request: "); Out.String(req^); Out.Ln;
+  i := 0;
+  REPEAT
+    Out.String("req["); Out.Int(i, 0); Out.String("]='");
+    Out.Char(req^[i]); Out.String("'; asciival=");
+    Out.Int(ORD(req^[i]), 0); Out.Ln;
+    INC(i);
+  UNTIL i = len;
 
   RETURN req;
 END buildRequest;
@@ -393,7 +405,7 @@ BEGIN
   Out.String("trying to build request"); Out.Ln;
   req := buildRequest(gemini);
   Out.String("trying to write the request to the client"); Out.Ln;
-  b := writer(gemini, req^);
+  b := gemini.Write(gemini, req^);
   
   IF b THEN
     gemini^.dyno := dynomaker(gemini);
