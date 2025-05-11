@@ -1,0 +1,174 @@
+
+Slide 1: Project Overview
+
+Title: Universal Getter (uget) – A Multi-Protocol Downloader
+Language: Oberon
+Purpose: Like wget, but supports more protocols
+Supported protocols:
+
+    gemini://
+
+    spartan://
+
+    nex://
+
+    http://
+
+    https://
+
+    “To help users retrieve files from less common protocols simply and efficiently.”
+
+Slide 2: Why Create uget?
+
+Problem:
+Most tools like wget only support HTTP/HTTPS.
+Access to alternative protocols (e.g., Gemini, Spartan) is limited.
+
+Goal:
+Build a universal downloader that can:
+
+    Connect via multiple protocols
+
+    Extend later into a full browser (e.g., Gemini Browser)
+
+Slide 3: What is a Protocol?
+
+A communication protocol is a set of rules for data transfer.
+
+Examples:
+
+    HTTP/HTTPS
+
+    Gemini
+
+    Spartan
+
+    Nex
+
+Definition:
+
+    “They define how data is formatted, transmitted, and received.”
+
+Slide 4: Client and Server
+
+Client: Sends request (like your browser or uget)
+Server: Responds with the file or error
+
+    uget is a client implemented in Oberon.
+    Spartan server used for testing: Michael Lazar’s Python implementation.
+
+Server Code Reference (Python):
+
+def handle_request(request):
+    path = request.path
+    with open(path, 'rb') as f:
+        return f.read()
+
+Slide 5: Why Oberon?
+
+    Low-level control
+
+    Clean, minimalistic syntax
+
+    Built for education and clarity
+
+    No bloated libraries
+
+    “I wanted to understand everything. No black boxes.”
+
+Dynamic Array Module (Oberon):
+
+PROCEDURE AddByte(VAR a: DynamicArray; b: BYTE);
+BEGIN
+  IF a.len = a.cap THEN
+    Expand(a);
+  END;
+  a.data[a.len] := b;
+  INC(a.len);
+END AddByte;
+
+Slide 6: How Does Downloading Work?
+
+Step-by-step:
+
+    Open TCP connection
+
+    Construct protocol-specific request
+
+    Send request to server
+
+    Read bytes into a buffer (dynamic array)
+
+    Save to file (optional)
+
+Key point:
+
+    No assumption of content-length
+
+    Buffer expands dynamically
+
+Slide 7: Example – Spartan Request
+
+Spartan request format:
+
+host path content-length\r\n
+[optional data block]
+
+Sample Spartan request:
+
+example.com /file.txt 0\r\n
+
+Response:
+
+2 text/plain\r\n
+(file content here...)
+
+Slide 8: Example – Gemini Request
+
+Gemini request format:
+
+gemini://example.com/file\r\n
+
+Server response:
+
+20 text/gemini\r\n
+# Welcome to Gemini!
+
+    Minimal, simple, secure over TLS
+
+Slide 9: The Dynamic Array Module
+
+Why we need it:
+We don’t always know how much data to expect.
+
+Features of our module:
+
+    Dynamically resizes
+
+    Reads one byte at a time
+
+    Frees memory when done
+
+Excerpt (Oberon):
+
+TYPE
+  DynamicArray = RECORD
+    data: POINTER TO ARRAY OF BYTE;
+    len, cap: INTEGER;
+  END;
+
+Slide 10: Future Work and Conclusion
+
+Planned improvements:
+
+    Upload support
+
+    Extend Gemini support into GUI browser
+
+    Better protocol abstraction
+
+Conclusion:
+
+    “uget is a tool for people who want to interact with the web beyond mainstream protocols.”
+    Built in Oberon, open-source, and educational.
+
