@@ -37,7 +37,7 @@ TYPE
     Write*: PROCEDURE(VAR spartan: Client; request: ARRAY OF CHAR): BOOLEAN;
     Read*: PROCEDURE(VAR spartan: Client; VAR buffer: ARRAY OF CHAR): BOOLEAN;
     Dynomaker: PROCEDURE(VAR spartan: Client): dynamicarray.dynamicarray;
-    Save*: PROCEDURE(VAR spartan: Client; name: ARRAY OF CHAR): dynamicarray.dynamicarray;
+    Save*: PROCEDURE(VAR spartan: Client; name: ARRAY OF CHAR);
   END;
 
 PROCEDURE clearState*(VAR spartan: Client);
@@ -49,13 +49,19 @@ BEGIN
 END clearState;
 
 PROCEDURE dynomaker(VAR spartan: Client): dynamicarray.dynamicarray;
-BEGIN 
-RETURN dynamicarray.Create();
+BEGIN
+  RETURN dynamicarray.Create();
 END dynomaker;
 
-PROCEDURE saver(VAR spartan: Client; name: ARRAY OF CHAR): dynamicarray.dynamicarray;
+PROCEDURE saver(VAR spartan: Client; name: ARRAY OF CHAR);
 BEGIN
-RETURN dynamicarray.writetofile(spartan^.dyno, name);
+  IF spartan^.dyno^.size <= 0 THEN
+    Out.String("No data to save or already saved"); Out.Ln;
+    RETURN;
+  END;
+
+  dynamicarray.writetofile(spartan^.dyno, name);
+  spartan^.dyno^.size := 0; 
 END saver;
 
 PROCEDURE connector(VAR spartan: Client): BOOLEAN;
@@ -84,7 +90,6 @@ PROCEDURE writer(VAR spartan: Client; request: ARRAY OF CHAR): BOOLEAN;
 BEGIN
   IF spartan^.trn IS bsdSocket THEN
     RETURN Internet.Write(spartan^.trn(bsdSocket).socket, request);
-  (*b := Internet.Write(spartan^.trn(bsdSocket).socket, req^);*)
   ELSE
     Out.String("Spartan client is not initialized with bsd socket"); Out.Ln;
     RETURN FALSE;
@@ -93,14 +98,19 @@ END writer;
 
 PROCEDURE readbuffer(VAR spartan: Client; VAR buf: ARRAY OF CHAR; VAR i: LONGINT): BOOLEAN;
 BEGIN
-IF spartan^.trn IS bsdSocket THEN 
-   RETURN Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i); 
-ELSE 
-Out.String("spartan is not inintialized with bsdSocket");Out.Ln;
-RETURN FALSE;
-END
+  IF spartan^.trn IS bsdSocket THEN
+    i := 0;
+    IF Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i) THEN
+      RETURN TRUE;
+    ELSE
+      i := 0;
+      RETURN FALSE;
+    END;
+  ELSE
+    Out.String("spartan is not initialized with bsdSocket"); Out.Ln;
+    RETURN FALSE;
+  END;
 END readbuffer;
-
 
 PROCEDURE reader(VAR spartan: Client; VAR buffer: ARRAY OF CHAR): BOOLEAN;
 BEGIN
@@ -117,47 +127,40 @@ VAR
   req: strTypes.pstring;
   len: INTEGER;
 BEGIN
-  (* Allocate request size based on host and path lengths *)
-  len := Strings.Length(spartan^.host^) + Strings.Length(spartan^.path^) + 10; (* SP and EOL *)
+  len := Strings.Length(spartan^.host^) + Strings.Length(spartan^.path^) + 5; (* +5 for spaces, "0", CRLF *)
   NEW(req, len);
 
-  (* Build the request line *)
-  Strings.Append(spartan^.host^, req^);
-  (*COPY(spartan^.host^, req^);*)
+  COPY(spartan^.host^, req^);
   Strings.Append(" ", req^);
   Strings.Append(spartan^.path^, req^);
-  (*Strings.Append(" ", req^);*)
-  (*                ^ ask inky: I keep changing this and the next line to Append " 0", req^ and it gives either the spartan protocol or # the spartan protocol*)
-  Strings.Append(" 0", req^); (* Placeholder for content-length in Spartan *)
+  Strings.Append(" 0", req^); (* "0" indicates no body content *)
   Strings.Append(spartan^.eol, req^);
-
   RETURN req;
 END buildRequest;
 
 PROCEDURE parseHeader(VAR spartan: Client; VAR str: ARRAY OF CHAR);
-VAR 
+VAR
   i: INTEGER;
-BEGIN 
+BEGIN
     Out.String("header is: '"); Out.String(str); Out.String("'"); Out.Ln;
   i := 0;
-  REPEAT 
-    IF (str[i] >= '0') & (str[i] <= '9') THEN 
-       spartan^.statusCode := ORD(str[i]) - ORD('0'); 
+  REPEAT
+    IF (str[i] >= '0') & (str[i] <= '9') THEN
+       spartan^.statusCode := ORD(str[i]) - ORD('0');
            Out.String("set status code:"); Out.Int(spartan^.statusCode, 0); Out.Ln;
     END;
     INC(i);
   UNTIL i = LEN(str);
 END parseHeader;
 
-
 PROCEDURE zeroBuf(VAR str: ARRAY OF CHAR);
 VAR i: INTEGER;
-BEGIN 
+BEGIN
   i := 0;
-  REPEAT
-  str[i] := 0X;
-  INC(i);
-  UNTIL i = LEN(str)
+  WHILE i < LEN(str) DO
+    str[i] := 0X;
+    INC(i);
+  END;
 END zeroBuf;
 
 PROCEDURE readTillCRLF(spartan: Client);
@@ -196,119 +199,177 @@ BEGIN
   parseHeader(spartan, spartan^.header^);
 END readTillCRLF;
 
+PROCEDURE extractFilename(path: ARRAY OF CHAR; VAR filename: ARRAY OF CHAR);
+VAR
+  i, j, len, lastSlash: LONGINT;
+BEGIN
+  filename[0] := 0X;
+  len := 0;
+  WHILE (len < LEN(path)) & (path[len] # 0X) DO
+    INC(len);
+  END;
+  lastSlash := -1;
+  FOR i := 0 TO len-1 DO
+    IF path[i] = '/' THEN
+      lastSlash := i;
+    END;
+  END;
+
+  IF lastSlash >= 0 THEN
+    j := 0;
+    FOR i := lastSlash + 1 TO len-1 DO
+      IF j < LEN(filename)-1 THEN
+        filename[j] := path[i];
+        INC(j);
+      END;
+    END;
+    filename[j] := 0X;
+  END;
+
+  IF filename[0] = 0X THEN
+    COPY(defName, filename);
+    Out.String("Using default filename: "); Out.String(filename); Out.Ln;
+    RETURN;
+  END;
+
+  i := 0;
+  WHILE (i < LEN(filename)) & (filename[i] # 0X) DO
+    IF (ORD(filename[i]) < 32) OR (filename[i] = ':') OR (filename[i] = '*') OR
+       (filename[i] = '?') OR (filename[i] = '"') OR (filename[i] = '<') OR
+       (filename[i] = '>') OR (filename[i] = '|') OR (ORD(filename[i]) = 127) THEN
+      filename[i] := '_';
+    END;
+    INC(i);
+  END;
+
+  Out.String("Extracted filename: "); Out.String(filename); Out.Ln;
+END extractFilename;
+
 PROCEDURE get*(spartan: Client): strTypes.pstring;
 VAR
   req: strTypes.pstring;
-  buf: ARRAY 16 OF CHAR;
-  (*ok so apparentl this k logic works iff reading chunk size is 16*)
-  (*so now it works with 14 bytes but doesnt read # in 16 bytes*)
-  i, k: LONGINT;
+  buf: ARRAY 4096 OF CHAR; 
+  i, j, totalBytes: LONGINT;
   b: BOOLEAN;
-  responseArr: dynamicarray.dynamicarray; 
-  (*header: dynamicarray.dynamicarray;*)
+  saveFilename: ARRAY 256 OF CHAR;
+          tmp: POINTER TO ARRAY OF CHAR;
+          oldSize, k: LONGINT;
+          file: Files.File;
+          r: Files.Rider;
 BEGIN
   spartan^.clearState(spartan);
+  totalBytes := 0;
 
-  spartan^.connectionFlag := spartan.Connect(spartan);
-  IF ~spartan^.connectionFlag THEN
+  IF (spartan^.path # NIL) & (spartan^.path^[0] # 0X) THEN
+    COPY(spartan^.path^, saveFilename);
+    IF saveFilename[0] = '/' THEN
+      i := 0;
+      WHILE saveFilename[i+1] # 0X DO
+        saveFilename[i] := saveFilename[i+1];
+        INC(i);
+      END;
+      saveFilename[i] := 0X;
+    END;
+  ELSE
+    COPY("download.bin", saveFilename);
+  END;
+
+  Out.String("Will save as: "); Out.String(saveFilename); Out.Ln;
+
+  IF ~spartan.Connect(spartan) THEN
     Out.String("Connection failed"); Out.Ln;
     HALT(5);
   END;
 
   req := buildRequest(spartan);
-  b := writer(spartan, req^);
-
-  IF b THEN
-    spartan^.dyno := dynomaker(spartan);
-    (*responseArr := dynamicarray.Create();*)
-    i := 0; k := 0;
-    readTillCRLF(spartan);
-    REPEAT
-      zeroBuf(buf);
-      (*b := Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i);*)
-         (*ask inky: when i implement it with oop with the line of code next, it incorrectly reads the request*)
-      b := readbuffer(spartan, buf, i);
-                (* ^ think later this is too weird*)
-      IF b THEN 
-        Out.String("-------------"); Out.Ln;
-        Out.String(buf); Out.Ln;
-        Out.String("-------------"); Out.Ln;
-     
-      (* 
-      IF k = 0 THEN
-         (*idea
-          create a dyn array here 
-          append the buf here 
-          store it to a global field of spartan
-          write toa seperate file to read
-         *)
-         (*spartan^.header := dynomaker(spartan);*)
-	 (*spartan^.header.appender(spartan^.header, buf);*)
-	 header.appender(header, buf);
-         NEW(spartan^.headerbody, LEN(buf));
-	 COPY(header^.content^, spartan^.headerbody^);
-         (*parseHeader(spartan, spartan^.headerbody^);*)
-         responseArr.appender(responseArr, "");
-         spartan^.dyno.appender(spartan^.dyno, "");
-         Out.String("content of the respons arr during first iter"); Out.String(responseArr.content^); Out.Ln;
-
-        Out.String("Tried to skip appending"); Out.Ln;
-      ELSE
-      *)
-
-      (*responseArr.appender(responseArr, buf);*)
-       (* NEW(spartan^.dyno^.content, LEN(buf));*)
-      spartan^.dyno.appender(spartan^.dyno, buf);
-      (*END;*)
-      Out.String("Response array contents so far:"); Out.Ln;
-      Out.String("-------------------------------------------------"); Out.Ln;
-     (* Out.String(responseArr^.content^); Out.Ln;*)
-      Out.String(spartan^.dyno^.content^); Out.Ln;
-      Out.String("-------------------------------------------------"); Out.Ln;
-      ELSE 
-        Out.String("couldnt connect"); Out.Ln;
-      END;
-    UNTIL ~b OR (i = 0);
-    NEW(spartan^.rspnBody, LEN(spartan^.dyno^.content^)); 
-    (*NEW(spartan^.rspnBody, LEN(responseArr^.content^));*)
-    COPY(spartan^.dyno^.content^, spartan^.rspnBody^);
-    (*COPY(responseArr^.content^, spartan^.rspnBody^);*)
-  ELSE
+  IF ~writer(spartan, req^) THEN
     Out.String("Failed to send request"); Out.Ln;
     HALT(5);
   END;
-  
+
+  readTillCRLF(spartan);
+  Out.String("Header received, status: "); Out.Int(spartan^.statusCode, 0); Out.Ln;
+  spartan^.dyno := dynamicarray.Create();
+  Out.String("Downloading...");
+  REPEAT
+    i := 0; 
+    b := Internet.ReadBuf(spartan^.trn(bsdSocket).socket, buf, i);
+
+    IF b & (i > 0) THEN
+      spartan^.dyno^.size := totalBytes + i;  (* Grow size *)
+      IF spartan^.dyno^.content = NIL THEN
+        NEW(spartan^.dyno^.content, i);
+        FOR j := 0 TO i - 1 DO
+          spartan^.dyno^.content^[j] := buf[j];
+        END;
+      ELSE
+          oldSize := totalBytes;
+          NEW(tmp, oldSize);
+          FOR k := 0 TO oldSize - 1 DO
+            tmp^[k] := spartan^.dyno^.content^[k];
+          END;
+          NEW(spartan^.dyno^.content, oldSize + i);
+          FOR k := 0 TO oldSize - 1 DO
+            spartan^.dyno^.content^[k] := tmp^[k];
+          END;
+          FOR k := 0 TO i - 1 DO
+            spartan^.dyno^.content^[oldSize + k] := buf[k];
+          END;
+        END;
+      END;
+
+      totalBytes := totalBytes + i;
+      Out.Char('.');
+  UNTIL ~b OR (i = 0);
+
+  Out.Ln;
+  Out.String("Total bytes downloaded: "); Out.Int(totalBytes, 0); Out.Ln;
+  NEW(spartan^.rspnBody, totalBytes + 1);
+  FOR i := 0 TO totalBytes - 1 DO
+    spartan^.rspnBody^[i] := spartan^.dyno^.content^[i];
+  END;
+  spartan^.rspnBody^[totalBytes] := 0X;
+  file := Files.New(saveFilename);
+  IF file # NIL THEN
+    Files.Set(r, file, 0);
+    FOR i := 0 TO totalBytes - 1 DO
+      Files.Write(r, spartan^.dyno^.content^[i]);
+    END;
+    Files.Register(file);
+    Files.Close(file);
+    Out.String("File saved: "); Out.String(saveFilename); Out.Ln;
+  ELSE
+    Out.String("Failed to create file"); Out.Ln;
+  END;
+
   spartan.Disconnect(spartan);
-  (*parseHeader(spartan, spartan^.headerbody^);*)
-  (*Out.String("HEADER CONTENT##################################################################"); Out.String(header^.content^); Out.Ln;
-  Out.String("HEADER CONTENT-----------------------------------------------------------------"); Out.String(spartan^.headerbody^); Out.Ln;
-  Out.String("STATUS CODE #######################################################"); Out.Int(spartan^.statusCode, 0); Out.Ln;*)
-  (*spartan^.dyno := saver(spartan, "H.txt");*)
-  (*dynamicarray.writetofile(responseArr, "HULLO.txt");*)
-  (*spartan^.header := saver(spartan, "header.txt");*) 
   RETURN spartan^.rspnBody;
 END get;
-
-
-
 
 PROCEDURE Create*(host, port, path: ARRAY OF CHAR): Client;
 VAR
   spartan: Client;
   socket: bsdSocket;
+  newPath: ARRAY 512 OF CHAR;
 BEGIN
   NEW(spartan);
   spartan^.eol[0] := 0DX; spartan^.eol[1] := 0AX; spartan^.null[0] := 0X;
-
-  (* Initialize fields *)
   strUtils.string2pstring(host, spartan^.host);
   strUtils.string2pstring(port, spartan^.port);
-  strUtils.string2pstring(path, spartan^.path);
-
-  (* Set default values *)
+  IF Strings.Length(path) = 0 THEN
+    strUtils.string2pstring("/", spartan^.path);
+    Out.String("Empty path detected, using '/' as default"); Out.Ln;
+  ELSE
+    IF path[0] # '/' THEN
+        newPath[0] := '/';
+        Strings.Append(path, newPath);
+        strUtils.string2pstring(newPath, spartan^.path);
+        Out.String("Path normalized to start with '/'"); Out.Ln;
+    ELSE
+      strUtils.string2pstring(path, spartan^.path);
+    END;
+  END;
   spartan^.contentLength := 0;
-
-  (* Assign methods *)
   spartan^.Create := Create;
   spartan^.Get := get;
   spartan^.clearState := clearState;
