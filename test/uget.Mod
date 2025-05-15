@@ -71,7 +71,6 @@ BEGIN
   s := SPARTAN.Create(arg.host, arg.port, arg.path);
   answer := s.Get(s);
   name := getFilename();
-  a := s.Save(s, name^);
   
 END ConnectSpartan;
 
@@ -87,7 +86,6 @@ BEGIN
  Out.String("left init in connect gemini"); Out.Ln;
  answer := g.Get(g);
  name := getFilename();
- a := g.Save(g, name^); 
 
 END ConnectGemini;
 
@@ -105,7 +103,6 @@ BEGIN
   s := NEX.Create(arg.host, arg.port, arg.path);
   answer := s.Get(s);
   file := getFilename();
-  a := s.Save(s, file^); 
 
 END ConnectNex;
  
@@ -117,7 +114,6 @@ VAR
 
 BEGIN 
   h := http.Create(arg.host, arg.port, arg.path);
-  (*h.appendAuthHdr(h, "sona", "sona");*)
   answer := h.Get(h);
   h.Save(h);
 
@@ -189,12 +185,6 @@ BEGIN
   hport := "80";
   hsport := "443";
 
-  (* 
-  REPEAT 
-    host[i] := cmd[i];
-  UNTIL cmd[i] = ':'; *)
-
-
   WHILE (i < LEN(cmd)) & (cmd[i] # ':') DO
     protocol[i] := cmd[i];
     INC(i);
@@ -216,7 +206,6 @@ BEGIN
     HALT(1);
   END;
 
-  (* Skip "://" *)
   IF (i < LEN(cmd) - 2) & (cmd[i] = ':') & (cmd[i + 1] = '/') & (cmd[i + 2] = '/') THEN
     INC(i, 3);
   ELSE
@@ -238,7 +227,7 @@ BEGIN
     path[j] := cmd[i];
     INC(i); INC(j);
   END;
-  path[j] := 0X; (* Null-terminate *)
+  path[j] := 0X; 
   IF (path = "/") THEN 
     Out.String("No path was interpreted. Aborting."); Out.Ln; HALT(6);
   END;
@@ -265,10 +254,6 @@ Out.String("length of the new str: "); Out.Int(totalLen, 0); Out.Ln;
 NEW(newstr, totalLen);
 IF newstr # NIL THEN 
 
-  (*Strings.Append(newstr^, strone);*)
-  (*Strings.Append(newstr^, dot);*)
-  (*newstr^[len1] := ".";*)
-  (*Strings.Append(newstr^, strtwo);*)
   i := 0; j := 0;
   REPEAT 
     newstr^[i] := strone[i];
@@ -301,7 +286,7 @@ BEGIN
   argLen := Strings.Length(tmp);
   NEW(cmd, argLen + 1); (* Allocate memory dynamically for cmd *)
   COPY(tmp, cmd^);
-  cmd^[argLen] := 0X; (* Null-terminate the string *)
+  cmd^[argLen] := 0X;
   Out.String("pstring to string cmd: "); Out.String(cmd^); Out.Ln;
  
 RETURN cmd
