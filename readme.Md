@@ -1,4 +1,4 @@
-# A universal downloader that downloads files from spartan://, nex:// and gemini:// protocols!
+# A universal downloader that downloads files from gemini://, spartan://, nex://, http:// and https:// protocols!
 
 You may find all the implementation details in the src folder.
 
@@ -17,19 +17,19 @@ git clone git@github.com:svetlanatad/protocols.git
 Or you can use https to clone as well.
 For testing or checking out the progress, in the protocols directory,  run
 ```
-make -f GNUmakefile2
+make
 
 ```
 This should get you all the dependencies. So if you get an error here, it is probably going to be something like "symbol file not found", in that case, search for that module online and place it in the build directory! Then,
 ```
-make -f GNUmakefile2 tests
+make tests
 ```
 This should build you the program, it should work if it got all the dependencies correctly.
 Try my program with:
 ```
 build/uget protocol://host/path-to-a-file
 ```
-To get my favorite file, run
+To get a file i like, run
 
 ```
 build/uget spartan://mozz.us/art.txt
